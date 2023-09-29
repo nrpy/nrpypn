@@ -46,15 +46,22 @@ n12U = ixp.zerorank1()
 n21U = ixp.zerorank1()
 p1U = ixp.zerorank1()
 p2U = ixp.zerorank1()
-for i in range(3):
-    n12U[i] = +nU[i]
-    n21U[i] = -nU[i]
-    p1U[i] = +pU[i]
-    p2U[i] = -pU[i]
+for _ in range(3):
+    n12U[_] = +nU[_]
+    n21U[_] = -nU[_]
+    p1U[_] = +pU[_]
+    p2U[_] = -pU[_]
 
 
 # Step 2.a: Define dot and cross product of vectors
 def dot(vec1: List[sp.Expr], vec2: List[sp.Expr]) -> sp.Expr:
+    """
+    Compute the dot product of two vectors.
+
+    :param vec1: First vector
+    :param vec2: Second vector
+    :return: Dot product of vec1 and vec2
+    """
     vec1_dot_vec2: sp.Expr = sp.sympify(0)
     for i in range(3):
         vec1_dot_vec2 += vec1[i] * vec2[i]
@@ -62,6 +69,13 @@ def dot(vec1: List[sp.Expr], vec2: List[sp.Expr]) -> sp.Expr:
 
 
 def cross(vec1: List[sp.Expr], vec2: List[sp.Expr]) -> List[sp.Expr]:
+    """
+    Compute the cross product of two vectors.
+
+    :param vec1: First vector
+    :param vec2: Second vector
+    :return: Cross product of vec1 and vec2
+    """
     vec1_cross_vec2: List[sp.Expr] = ixp.zerorank1()
     LeviCivitaSymbol = ixp.LeviCivitaSymbol_dim3_rank3()
     for i in range(3):
@@ -71,8 +85,14 @@ def cross(vec1: List[sp.Expr], vec2: List[sp.Expr]) -> List[sp.Expr]:
     return vec1_cross_vec2
 
 
-# Step 2.b: Construct rational numbers a/b via div(a,b)
 def div(a: int, b: int) -> sp.Rational:
+    """
+    Create a SymPy Rational number a/b=Rational(a,b) from two integers a and b.
+
+    :param a: Numerator
+    :param b: Denominator
+    :return: Rational number a/b
+    """
     return cast(sp.Rational, sp.Rational(a, b))
 
 
@@ -91,6 +111,22 @@ def num_eval(
     nPt: Optional[float] = None,
     ndrdt: Optional[float] = None,
 ) -> float:
+    """
+    Numerically evaluate SymPy/NRPyPN expressions.
+
+    :param expr: Expression to evaluate
+    :param qmassratio: Mass ratio, must be >= 1
+    :param nr: Orbital separation
+    :param nchi1x: x-component of the first spin
+    :param nchi1y: y-component of the first spin
+    :param nchi1z: z-component of the first spin
+    :param nchi2x: x-component of the second spin
+    :param nchi2y: y-component of the second spin
+    :param nchi2z: z-component of the second spin
+    :param nPt: Optional Pt value
+    :param ndrdt: Optional drdt value
+    :return: Numerical value of the expression
+    """
     # DERIVED QUANTITIES BELOW
     # We want m1+m2 = 1, so that
     #         m2/m1 = qmassratio
