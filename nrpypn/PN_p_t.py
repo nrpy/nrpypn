@@ -19,9 +19,6 @@ f_p_t(m1,m2, chi1U,chi2U, r)
 Author:  Zach Etienne
          zachetie **at** gmail **dot* com
 """
-
-# Step 0: Add NRPy's directory to the path
-# https://stackoverflow.com/questions/16780014/import-file-from-parent-directory
 from typing import List, cast
 import sympy as sp  # SymPy: The Python computer algebra package upon which NRPy+ depends
 import nrpy.indexedexp as ixp  # NRPy+: Symbolic indexed expression (e.g., tensors, vectors, etc.) support

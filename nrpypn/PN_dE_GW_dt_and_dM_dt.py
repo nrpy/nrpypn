@@ -14,22 +14,16 @@ f_dE_GW_dt(mOmega, m1,m2, n12U, S1U,S2U):
 Author:  Zach Etienne
          zachetie **at** gmail **dot* com
 """
-
-# Step 0: Add NRPy's directory to the path
-# https://stackoverflow.com/questions/16780014/import-file-from-parent-directory
 from typing import List, Tuple, cast
 import sympy as sp  # SymPy: The Python computer algebra package upon which NRPy+ depends
-
 import nrpy.indexedexp as ixp  # NRPy+: Symbolic indexed expression (e.g., tensors, vectors, etc.) support
 import nrpy.validate_expressions.validate_expressions as ve
-from nrpypn.NRPyPN_shortcuts import (
-    div,
-    dot,
-    gamma_EulerMascheroni,
-)  # NRPyPN: shortcuts for e.g., vector operations
+
+# NRPyPN: shortcuts for e.g., vector operations
+from nrpypn.NRPyPN_shortcuts import div, dot, gamma_EulerMascheroni
 
 
-class dE_GW_dt_and_dM_dt:
+class PN_dE_GW_dt_and_dM_dt:
     """
     This class calculates gravitational-wave energy flux and mass flux.
     Implements Eqs: A1-13 of https://arxiv.org/abs/1502.01747
@@ -80,7 +74,7 @@ class dE_GW_dt_and_dM_dt:
         :param _n12U: Unused parameter for compatibility
         :param S1U: List of symbolic expressions for S1U
         :param S2U: List of symbolic expressions for S2U
-        :return: Tuple of calculated constants and lists of symbolic expressions
+        :return: Tuple of calculated constants and lists of symbolic expressions: nu, delta, l, chi_a, chi_s, s_l, sigma_l
         """
         # define scalars:
         m = m1 + m2
@@ -207,7 +201,7 @@ if __name__ == "__main__":
     in_n12U: List[sp.Expr] = cast(List[sp.Expr], ixp.declarerank1("n12U"))
     in_S1U: List[sp.Expr] = cast(List[sp.Expr], ixp.declarerank1("S1U"))
     in_S2U: List[sp.Expr] = cast(List[sp.Expr], ixp.declarerank1("S2U"))
-    mass_energy_fluxes = dE_GW_dt_and_dM_dt(
+    mass_energy_fluxes = PN_dE_GW_dt_and_dM_dt(
         in_mOmega, in_m1, in_m2, in_n12U, in_S1U, in_S2U
     )
     results_dict = ve.process_dictionary_of_expressions(

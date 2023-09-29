@@ -1,19 +1,18 @@
-# As documented in the NRPyPN notebook
-# NRPyPN_shortcuts.ipynb, this Python script
-# provides useful shortcuts for inputting
-# post-Newtonian expressions into SymPy/NRPy+
+"""
+As documented in the NRPyPN notebook
+NRPyPN_shortcuts.ipynb, this Python script
+provides useful shortcuts for inputting
+post-Newtonian expressions into SymPy/NRPy+
 
-# Basic functions:
-# dot(a,b): 3-vector dot product
-# cross(a,b): 3-vector cross product
-# div(a,b): a shortcut for SymPy's sp.Rational(a,b), to declare rational numbers
-# num_eval(expr): Numerically evaluates NRPyPN expressions
+Basic functions:
+dot(a,b): 3-vector dot product
+cross(a,b): 3-vector cross product
+div(a,b): a shortcut for SymPy's sp.Rational(a,b), to declare rational numbers
+num_eval(expr): Numerically evaluates NRPyPN expressions
 
-# Author:  Zach Etienne
-#          zachetie **at** gmail **dot* com
-
-# Step 0: Add NRPy's directory to the path
-# https://stackoverflow.com/questions/16780014/import-file-from-parent-directory
+Author:  Zach Etienne
+         zachetie **at** gmail **dot* com
+"""
 from typing import List, cast, Optional
 import sympy as sp  # SymPy: The Python computer algebra package upon which NRPy+ depends
 import nrpy.indexedexp as ixp  # NRPy+: Symbolic indexed expression (e.g., tensors, vectors, etc.) support
@@ -135,7 +134,6 @@ def num_eval(
         .subs(sp.pi, sp.N(sp.pi))
         .subs(gamma_EulerMascheroni, sp.N(sp.EulerGamma)),
     )
-
 
 
 # import nrpypn.PN_p_t as pt
