@@ -14,8 +14,11 @@
 
 # Step 0: Add NRPy's directory to the path
 # https://stackoverflow.com/questions/16780014/import-file-from-parent-directory
+from typing import List, cast, Optional
 import sympy as sp  # SymPy: The Python computer algebra package upon which NRPy+ depends
 import nrpy.indexedexp as ixp  # NRPy+: Symbolic indexed expression (e.g., tensors, vectors, etc.) support
+import nrpypn.PN_p_t as pt
+import nrpypn.PN_p_r as pr
 
 # Step 1: Declare several global variables used
 #         throughout NRPyPN
@@ -54,15 +57,15 @@ for i in range(3):
 
 
 # Step 2.a: Define dot and cross product of vectors
-def dot(vec1, vec2):
-    vec1_dot_vec2 = sp.sympify(0)
+def dot(vec1: List[sp.Expr], vec2: List[sp.Expr]) -> sp.Expr:
+    vec1_dot_vec2: sp.Expr = sp.sympify(0)
     for i in range(3):
         vec1_dot_vec2 += vec1[i] * vec2[i]
     return vec1_dot_vec2
 
 
-def cross(vec1, vec2):
-    vec1_cross_vec2 = ixp.zerorank1()
+def cross(vec1: List[sp.Expr], vec2: List[sp.Expr]) -> List[sp.Expr]:
+    vec1_cross_vec2: List[sp.Expr] = ixp.zerorank1()
     LeviCivitaSymbol = ixp.LeviCivitaSymbol_dim3_rank3()
     for i in range(3):
         for j in range(3):
@@ -72,25 +75,25 @@ def cross(vec1, vec2):
 
 
 # Step 2.b: Construct rational numbers a/b via div(a,b)
-def div(a, b):
-    return sp.Rational(a, b)
+def div(a: int, b: int) -> sp.Rational:
+    return cast(sp.Rational, sp.Rational(a, b))
 
 
 # Step 3: num_eval(expr), a means to numerically evaluate SymPy/NRPyPN
 #         expressions
 def num_eval(
-    expr,
-    qmassratio=1.0,  # must be >= 1
-    nr=12.0,  # Orbital separation
-    nchi1x=+0.0,
-    nchi1y=+0.0,
-    nchi1z=+0.0,
-    nchi2x=+0.0,
-    nchi2y=+0.0,
-    nchi2z=+0.0,
-    nPt=None,
-    ndrdt=None,
-):
+    expr: sp.Expr,
+    qmassratio: float = 1.0,  # must be >= 1
+    nr: float = 12.0,  # Orbital separation
+    nchi1x: float = +0.0,
+    nchi1y: float = +0.0,
+    nchi1z: float = +0.0,
+    nchi2x: float = +0.0,
+    nchi2y: float = +0.0,
+    nchi2z: float = +0.0,
+    nPt: Optional[float] = None,
+    ndrdt: Optional[float] = None,
+) -> float:
     # DERIVED QUANTITIES BELOW
     # We want m1+m2 = 1, so that
     #         m2/m1 = qmassratio
@@ -107,13 +110,14 @@ def num_eval(
     nS2U1 = nchi2y * nm2**2
     nS2U2 = nchi2z * nm2**2
 
-    if nPt != None:
+    if nPt:
         expr2 = expr.subs(Pt, nPt)
         expr = expr2
-    if ndrdt != None:
+    if ndrdt:
         expr2 = expr.subs(drdt, ndrdt)
         expr = expr2
-    return (
+    return cast(
+        float,
         expr.subs(m1, nm1)
         .subs(m2, nm2)
         .subs(S1U[0], nS1U0)
@@ -131,7 +135,7 @@ def num_eval(
         .subs(r, nr)
         .subs(q, nr)
         .subs(sp.pi, sp.N(sp.pi))
-        .subs(gamma_EulerMascheroni, sp.N(sp.EulerGamma))
+        .subs(gamma_EulerMascheroni, sp.N(sp.EulerGamma)),
     )
 
 
@@ -145,39 +149,35 @@ def num_eval(
 # The numerical values for
 #  * P_t: the tangential momentum
 #  * P_r: the radial momentum
-def eval__P_t__and__P_r(qmassratio, nr, nchi1x, nchi1y, nchi1z, nchi2x, nchi2y, nchi2z):
-    # Compute p_t, the tangential component of momentum
-    import PN_p_t as pt
-
-    pt.f_p_t(m1, m2, chi1U, chi2U, r)
-
-    # Compute p_r, the radial component of momentum
-    import PN_p_r as pr
-
-    pr.f_p_r(m1, m2, n12U, n21U, chi1U, chi2U, S1U, S2U, p1U, p2U, r)
-
-    nPt = num_eval(
-        pt.p_t,
-        qmassratio=qmassratio,
-        nr=nr,
-        nchi1x=nchi1x,
-        nchi1y=nchi1y,
-        nchi1z=nchi1z,
-        nchi2x=nchi2x,
-        nchi2y=nchi2y,
-        nchi2z=nchi2z,
-    )
-
-    nPr = num_eval(
-        pr.p_r,
-        qmassratio=qmassratio,
-        nr=nr,
-        nchi1x=nchi1x,
-        nchi1y=nchi1y,
-        nchi1z=nchi1z,
-        nchi2x=nchi2x,
-        nchi2y=nchi2y,
-        nchi2z=nchi2z,
-        nPt=nPt,
-    )
-    return nPt, nPr
+# def eval__P_t__and__P_r(qmassratio, nr, nchi1x, nchi1y, nchi1z, nchi2x, nchi2y, nchi2z):
+#     # Compute p_t, the tangential component of momentum
+#     pt.f_p_t(m1, m2, chi1U, chi2U, r)
+#
+#     # Compute p_r, the radial component of momentum
+#     pr.f_p_r(m1, m2, n12U, n21U, chi1U, chi2U, S1U, S2U, p1U, p2U, r)
+#
+#     nPt = num_eval(
+#         pt.p_t,
+#         qmassratio=qmassratio,
+#         nr=nr,
+#         nchi1x=nchi1x,
+#         nchi1y=nchi1y,
+#         nchi1z=nchi1z,
+#         nchi2x=nchi2x,
+#         nchi2y=nchi2y,
+#         nchi2z=nchi2z,
+#     )
+#
+#     nPr = num_eval(
+#         pr.p_r,
+#         qmassratio=qmassratio,
+#         nr=nr,
+#         nchi1x=nchi1x,
+#         nchi1y=nchi1y,
+#         nchi1z=nchi1z,
+#         nchi2x=nchi2x,
+#         nchi2y=nchi2y,
+#         nchi2z=nchi2z,
+#         nPt=nPt,
+#     )
+#     return nPt, nPr
