@@ -51,6 +51,7 @@ class PN_Hamiltonian_NS:
         self.H_NS_3PN: sp.Expr = sp.sympify(0)
 
         self.f_H_Newt__H_NS_1PN__H_NS_2PN(m1, m2, PU, nU, q)
+        self.f_H_NS_3PN(m1, m2, PU, nU, q)
 
     def f_H_Newt__H_NS_1PN__H_NS_2PN(
         self, m1: sp.Expr, m2: sp.Expr, PU: List[sp.Expr], nU: List[sp.Expr], q: sp.Expr

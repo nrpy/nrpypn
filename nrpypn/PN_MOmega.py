@@ -48,6 +48,7 @@ class PN_MOmega:
         self.a_5: sp.Expr = sp.sympify(0)
         self.a_6: sp.Expr = sp.sympify(0)
         self.a_7: sp.Expr = sp.sympify(0)
+        self.MOmega: sp.Expr = sp.sympify(0)
         self.f_MOmega(m1, m2, chi1U, chi2U, r)
 
     def MOmega__a_2_thru_a_4(
@@ -183,7 +184,7 @@ class PN_MOmega:
             m1, m2, chi1U[0], chi1U[1], chi1U[2], chi2U[0], chi2U[1], chi2U[2]
         )
         a[7] = self.a_7
-        self.MOmega = 1  # Term prior to the sum in parentheses
+        self.MOmega = sp.sympify(1)  # Term prior to the sum in parentheses
         for k in range(8):
             self.MOmega += a[k] / r ** div(k, 2)
         self.MOmega *= 1 / r ** div(3, 2)

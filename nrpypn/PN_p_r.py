@@ -19,36 +19,56 @@ import nrpy.validate_expressions.validate_expressions as ve
 
 # NRPyPN: shortcuts for e.g., vector operations
 from nrpypn.NRPyPN_shortcuts import Pt, Pr, nU, div
-import nrpypn.PN_p_t as pt
+from nrpypn.PN_p_t import PN_p_t
+from nrpypn.PN_MOmega import PN_MOmega
 from nrpypn.PN_dE_GW_dt_and_dM_dt import PN_dE_GW_dt_and_dM_dt
 from nrpypn.PN_Hamiltonian_NS import PN_Hamiltonian_NS
 from nrpypn.PN_Hamiltonian_SS import PN_Hamiltonian_SS
 from nrpypn.PN_Hamiltonian_SSS import PN_Hamiltonian_SSS
 from nrpypn.PN_Hamiltonian_SO import PN_Hamiltonian_SO
 
-import nrpypn.PN_MOmega as MOm
-
 
 class PN_p_r:
     """
 
-    Core functions:
+    Core class functions:
     f_dr_dt(Htot_xyplane_binary, m1,m2, n12U,n21U, chi1U,chi2U, S1U,S2U, p1U,p2U, r)
-            Given Htot_xyplane_binary (computed
-            above) and other standard input
-            parameters, compute
-            dr_dt = dr/dt and store to class
-            variable of the same name.
-
-    f_p_r(m1,m2, chi1U,chi2U, r)
-          Compute p_r and store to
-          class variable of the same name.
+        Given Htot_xyplane_binary and other standard input parameters, compute
+        dr_dt = dr/dt and store to class variable of the same name.
 
     f_p_r_fullHam(m1,m2, n12U,n21U, chi1U,chi2U, S1U,S2U, p1U,p2U, r)
-          Compute p_r using the full
-          Hamiltonian, without truncating
+          Compute p_r using the full Hamiltonian, without truncating
           higher-order terms self-consistently.
+
+    f_p_r(m1,m2, chi1U,chi2U, r)
+          Compute p_r and store to class variable of the same name.
     """
+
+    def __init__(
+        self,
+        m1: sp.Expr,
+        m2: sp.Expr,
+        n12U: List[sp.Expr],
+        n21U: List[sp.Expr],
+        chi1U: List[sp.Expr],
+        chi2U: List[sp.Expr],
+        S1U: List[sp.Expr],
+        S2U: List[sp.Expr],
+        p1U: List[sp.Expr],
+        p2U: List[sp.Expr],
+        r: sp.Expr,
+        use_alternative_approach_for_p_r: bool = False,
+    ):
+        self.Htot_xyplane_binary: sp.Expr = sp.sympify(0)
+        self.dr_dt: sp.Expr = sp.sympify(0)
+        self.p_r: sp.Expr = sp.sympify(0)
+
+        if use_alternative_approach_for_p_r:
+            self.f_p_r_alternative__use_fullHam(
+                m1, m2, n12U, n21U, chi1U, chi2U, S1U, S2U, p1U, p2U, r
+            )
+        else:
+            self.f_p_r(m1, m2, n12U, n21U, chi1U, chi2U, S1U, S2U, p1U, p2U, r)
 
     #################################
     #################################
@@ -58,6 +78,7 @@ class PN_p_r:
     #         orbiting on the xy plane, store
     #         result to Htot_xyplane_binary
     def f_Htot_xyplane_binary(
+        self,
         m1: sp.Expr,
         m2: sp.Expr,
         n12U: List[sp.Expr],
@@ -67,7 +88,7 @@ class PN_p_r:
         p1U: List[sp.Expr],
         p2U: List[sp.Expr],
         r: sp.Expr,
-    ):
+    ) -> None:
         """
         Given standard input parameters, compute
         the Hamiltonian for a binary system
@@ -76,10 +97,11 @@ class PN_p_r:
         Htot_xyplane_binary
         """
 
-        def make_replacements(expr):
+        def make_replacements(expr: sp.Expr) -> sp.Expr:
             zero = sp.sympify(0)
             one = sp.sympify(1)
-            return (
+            return cast(
+                sp.Expr,
                 expr.subs(p1U[1], Pt)
                 .subs(p2U[1], -Pt)
                 .subs(p1U[2], zero)
@@ -88,36 +110,41 @@ class PN_p_r:
                 .subs(p2U[0], Pr)
                 .subs(nU[0], one)
                 .subs(nU[1], zero)
-                .subs(nU[2], zero)
+                .subs(nU[2], zero),
             )
 
         H_NS = PN_Hamiltonian_NS(m1, m2, p1U, n12U, r)
 
         self.Htot_xyplane_binary = make_replacements(
-            +H_NS.H_Newt + H_NS.H_NS_1PN + H_NS.H_NS_2PN + H_NS.H_NS_3PN
+            H_NS.H_Newt + H_NS.H_NS_1PN + H_NS.H_NS_2PN + H_NS.H_NS_3PN
         )
 
-        H_SO.f_H_SO_1p5PN(m1, m2, n12U, n21U, S1U, S2U, p1U, p2U, r)
-        H_SO.f_H_SO_2p5PN(m1, m2, n12U, n21U, S1U, S2U, p1U, p2U, r)
-        H_SO.f_H_SO_3p5PN(m1, m2, n12U, n21U, S1U, S2U, p1U, p2U, r)
+        H_SO = PN_Hamiltonian_SO(m1, m2, n12U, n21U, S1U, S2U, p1U, p2U, r)
         self.Htot_xyplane_binary += make_replacements(
-            +H_SO.H_SO_1p5PN + H_SO.H_SO_2p5PN + H_SO.H_SO_3p5PN
+            H_SO.H_SO_1p5PN + H_SO.H_SO_2p5PN + H_SO.H_SO_3p5PN
         )
 
-        H_SS.f_H_SS_2PN(m1, m2, S1U, S2U, nU, r)
-        H_SS.f_H_SS_S1S2_3PN(m1, m2, n12U, S1U, S2U, p1U, p2U, r)
-        H_SS.f_H_SS_S1sq_S2sq_3PN(m1, m2, n12U, n21U, S1U, S2U, p1U, p2U, r)
-        Htot_xyplane_binary += make_replacements(
-            +H_SS.H_SS_2PN + H_SS.H_SS_S1S2_3PN + H_SS.H_SS_S1sq_S2sq_3PN
+        H_SS = PN_Hamiltonian_SS(m1, m2, n12U, n21U, S1U, S2U, p1U, p2U, r)
+        self.Htot_xyplane_binary += make_replacements(
+            H_SS.H_SS_2PN + H_SS.H_SS_S1S2_3PN + H_SS.H_SS_S1sq_S2sq_3PN
         )
 
-        import PN_Hamiltonian_SSS as H_SSS
-
-        H_SSS.f_H_SSS_3PN(m1, m2, n12U, n21U, S1U, S2U, p1U, p2U, r)
-        Htot_xyplane_binary += make_replacements(+H_SSS.H_SSS_3PN)
+        H_SSS = PN_Hamiltonian_SSS(m1, m2, n12U, n21U, S1U, S2U, p1U, p2U, r)
+        self.Htot_xyplane_binary += make_replacements(H_SSS.H_SSS_3PN)
 
     # Function for computing dr/dt
-    def f_dr_dt(self, Htot_xyplane_binary, m1, m2, n12U, chi1U, chi2U, S1U, S2U, r):
+    def f_dr_dt(
+        self,
+        Htot_xyplane_binary: sp.Expr,
+        m1: sp.Expr,
+        m2: sp.Expr,
+        n12U: List[sp.Expr],
+        chi1U: List[sp.Expr],
+        chi2U: List[sp.Expr],
+        S1U: List[sp.Expr],
+        S2U: List[sp.Expr],
+        r: sp.Expr,
+    ) -> None:
         """
         Given Htot_xyplane_binary (computed
         above) and other standard input
@@ -126,7 +153,7 @@ class PN_p_r:
         variable of the same name.
         """
         # First compute p_t
-        pt.f_p_t(m1, m2, chi1U, chi2U, r)
+        pt = PN_p_t(m1, m2, chi1U, chi2U, r)
 
         # Then compute dH_{circ}/dr = partial_H(p_r=0)/partial_r
         #                                  + partial_H(p_r=0)/partial_{p_t} partial_{p_t}/partial_r
@@ -135,17 +162,31 @@ class PN_p_r:
         ) * sp.diff(pt.p_t, r)
 
         # Then compute M Omega
-        MOm.f_MOmega(m1, m2, chi1U, chi2U, r)
+        MOm = PN_MOmega(m1, m2, chi1U, chi2U, r)
 
         # Next compute dE_GW_dt_plus_dM_dt
-        dEdt = dE_GW_dt_and_dM_dt(MOm.MOmega, m1, m2, n12U, S1U, S2U)
+        dE_GW_dt_and_dM_dt = PN_dE_GW_dt_and_dM_dt(MOm.MOmega, m1, m2, n12U, S1U, S2U)
+        dE_GW_dt_plus_dM_dt = dE_GW_dt_and_dM_dt.dE_GW_dt_plus_dM_dt
 
         # Finally, compute dr/dt
-        self.dr_dt = dEdt.dE_GW_dt_plus_dM_dt / dHcirc_dr
+        self.dr_dt = dE_GW_dt_plus_dM_dt / dHcirc_dr
 
     # Next we compute p_r as a function of dr_dt (unknown) and known quantities using
     # p_r  approx [dr/dt - (partial_H/partial_{p_r})|_{p_r=0}] * [(partial^2_{H}/partial_{p_r^2})|_{p_r=0}]^{-1}
-    def f_p_r_fullHam(self, m1, m2, n12U, n21U, chi1U, chi2U, S1U, S2U, p1U, p2U, r):
+    def f_p_r_alternative__use_fullHam(
+        self,
+        m1: sp.Expr,
+        m2: sp.Expr,
+        n12U: List[sp.Expr],
+        n21U: List[sp.Expr],
+        chi1U: List[sp.Expr],
+        chi2U: List[sp.Expr],
+        S1U: List[sp.Expr],
+        S2U: List[sp.Expr],
+        p1U: List[sp.Expr],
+        p2U: List[sp.Expr],
+        r: sp.Expr,
+    ) -> None:
         """
         Basic equation for p_r can be written in the
           form:
@@ -164,23 +205,38 @@ class PN_p_r:
            we also need input from the PN_MOmega.py Python module.
         """
         self.f_Htot_xyplane_binary(m1, m2, n12U, n21U, S1U, S2U, p1U, p2U, r)
-        self.f_dr_dt(Htot_xyplane_binary, m1, m2, n12U, chi1U, chi2U, S1U, S2U, r)
+        self.f_dr_dt(self.Htot_xyplane_binary, m1, m2, n12U, chi1U, chi2U, S1U, S2U, r)
 
-        dHdpr_przero = sp.diff(Htot_xyplane_binary, Pr).subs(Pr, sp.sympify(0))
-        d2Hdpr2_przero = sp.diff(sp.diff(Htot_xyplane_binary, Pr), Pr).subs(
+        dHdpr_przero = sp.diff(self.Htot_xyplane_binary, Pr).subs(Pr, sp.sympify(0))
+        d2Hdpr2_przero = sp.diff(sp.diff(self.Htot_xyplane_binary, Pr), Pr).subs(
             Pr, sp.sympify(0)
         )
-        self.p_r_fullHam = (dr_dt - dHdpr_przero) / (d2Hdpr2_przero)
+        self.p_r = (self.dr_dt - dHdpr_przero) / (d2Hdpr2_przero)
 
-    # Here's the Ramos-Buades, Husa, and Pratten (2018)
-    #  approach for computing p_r.
-    # Transcribed from Eq 2.18 of
-    # Ramos-Buades, Husa, and Pratten (2018),
-    #   https://arxiv.org/abs/1810.00036
-    def f_p_r(self, m1, m2, n12U, n21U, chi1U, chi2U, S1U, S2U, p1U, p2U, r):
+    def f_p_r(
+        self,
+        m1: sp.Expr,
+        m2: sp.Expr,
+        n12U: List[sp.Expr],
+        n21U: List[sp.Expr],
+        chi1U: List[sp.Expr],
+        chi2U: List[sp.Expr],
+        S1U: List[sp.Expr],
+        S2U: List[sp.Expr],
+        p1U: List[sp.Expr],
+        p2U: List[sp.Expr],
+        r: sp.Expr,
+    ) -> None:
+        """
+        Ramos-Buades, Husa, and Pratten (2018)
+          approach for computing p_r.
+        Transcribed from Eq 2.18 of
+        Ramos-Buades, Husa, and Pratten (2018),
+          https://arxiv.org/abs/1810.00036
+        """
         q = m2 / m1  # It is assumed that q >= 1, so m2 >= m1.
         self.f_Htot_xyplane_binary(m1, m2, n12U, n21U, S1U, S2U, p1U, p2U, r)
-        self.f_dr_dt(Htot_xyplane_binary, m1, m2, n12U, chi1U, chi2U, S1U, S2U, r)
+        self.f_dr_dt(self.Htot_xyplane_binary, m1, m2, n12U, chi1U, chi2U, S1U, S2U, r)
         chi1x = chi1U[0]
         chi1y = chi1U[1]
         chi1z = chi1U[2]
@@ -188,7 +244,7 @@ class PN_p_r:
         chi2y = chi2U[1]
         chi2z = chi2U[2]
         # fmt: off
-        p_r_num = (-dr_dt
+        p_r_num = (-self.dr_dt
                    +(-(6*q+13)*q**2*chi1x*chi2y/(4*(q+1)**4)
                      -(6*q+ 1)*q**2*chi2x*chi2y/(4*(q+1)**4)
                      +chi1y*(-q*(   q+6)*chi1x/(4*(q+1)**4)
@@ -232,12 +288,26 @@ if __name__ == "__main__":
     in_m1, in_m2, in_r12 = sp.symbols("m1 m2 r12")
     in_n12U: List[sp.Expr] = cast(List[sp.Expr], ixp.declarerank1("n12U"))
     in_n21U: List[sp.Expr] = cast(List[sp.Expr], ixp.declarerank1("n21U"))
+    in_chi1U: List[sp.Expr] = cast(List[sp.Expr], ixp.declarerank1("chi1U"))
+    in_chi2U: List[sp.Expr] = cast(List[sp.Expr], ixp.declarerank1("chi2U"))
     in_S1U: List[sp.Expr] = cast(List[sp.Expr], ixp.declarerank1("S1U"))
     in_S2U: List[sp.Expr] = cast(List[sp.Expr], ixp.declarerank1("S2U"))
     in_p1U: List[sp.Expr] = cast(List[sp.Expr], ixp.declarerank1("p1U"))
     in_p2U: List[sp.Expr] = cast(List[sp.Expr], ixp.declarerank1("p2U"))
     in_nU: List[sp.Expr] = cast(List[sp.Expr], ixp.declarerank1("nU"))
-    p_r = PN_p_r(in_m1, in_m2, in_n12U, in_n21U, in_S1U, in_S2U, in_p1U, in_p2U, in_r12)
+    p_r = PN_p_r(
+        in_m1,
+        in_m2,
+        in_n12U,
+        in_n21U,
+        in_chi1U,
+        in_chi2U,
+        in_S1U,
+        in_S2U,
+        in_p1U,
+        in_p2U,
+        in_r12,
+    )
     results_dict = ve.process_dictionary_of_expressions(
         p_r.__dict__, fixed_mpfs_for_free_symbols=True
     )
