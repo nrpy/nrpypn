@@ -17,8 +17,6 @@
 from typing import List, cast, Optional
 import sympy as sp  # SymPy: The Python computer algebra package upon which NRPy+ depends
 import nrpy.indexedexp as ixp  # NRPy+: Symbolic indexed expression (e.g., tensors, vectors, etc.) support
-import nrpypn.PN_p_t as pt
-import nrpypn.PN_p_r as pr
 
 # Step 1: Declare several global variables used
 #         throughout NRPyPN
@@ -138,6 +136,10 @@ def num_eval(
         .subs(gamma_EulerMascheroni, sp.N(sp.EulerGamma)),
     )
 
+
+
+# import nrpypn.PN_p_t as pt
+# import nrpypn.PN_p_r as pr
 
 # Shortcut function to just evaluate P_t and P_r
 #  -= Inputs =-

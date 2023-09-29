@@ -122,19 +122,30 @@ class PN_p_t:
     ) -> None:
         """
         Construct terms a_5 and a_6, from
-         Eq A2 of Ramos-Buades, Husa, and Pratten (2018)
-           https://arxiv.org/abs/1810.00036
-         These terms have been independently validated
-           against the same terms in Eq 7 of
-         Healy, Lousto, Nakano, and Zlochower (2017)
-           https://arxiv.org/abs/1702.00872
-         and a sign error was corrected in the a_5
-         expression.
+        Eq A2 of Ramos-Buades, Husa, and Pratten (2018)
+        https://arxiv.org/abs/1810.00036
+        These terms have been independently validated
+        against the same terms in Eq 7 of
+        Healy, Lousto, Nakano, and Zlochower (2017)
+        https://arxiv.org/abs/1702.00872
+        and a sign error was corrected in the a_5
+        expression.
+
+        :param m1: mass of object 1
+        :param m2: mass of object 2
+        :param chi1x: x-component of spin of object 1
+        :param chi1y: y-component of spin of object 1
+        :param chi1z: z-component of spin of object 1
+        :param chi2x: x-component of spin of object 2
+        :param chi2y: y-component of spin of object 2
+        :param chi2z: z-component of spin of object 2
+        :param FixSignError: boolean to determine if sign error should be fixed
         """
-        SignFix = sp.sympify(-1)
-        if not FixSignError:
-            SignFix = sp.sympify(+1)
-        q = m2 / m1  # It is assumed that q >= 1, so m2 >= m1.
+        # Initialize the SignFix based on FixSignError
+        SignFix = sp.sympify(-1) if FixSignError else sp.sympify(1)
+
+        # It is assumed that q >= 1, so m2 >= m1.
+        q = m2 / m1
         # fmt: off
         self.a_5 = (SignFix*(13*q**3 + 60*q**2 + 116*q + 72)*chi1z/(16*(q+1)**4)
                     +(-72*q**4 - 116*q**3 - 60*q**2 - 13*q)*chi2z/(16*(q+1)**4))
@@ -166,6 +177,15 @@ class PN_p_t:
         Construct term a_7, from Eq A2 of
          Ramos-Buades, Husa, and Pratten (2018)
            https://arxiv.org/abs/1810.00036
+
+        :param m1: mass of object 1
+        :param m2: mass of object 2
+        :param chi1x: x-component of spin of object 1
+        :param chi1y: y-component of spin of object 1
+        :param chi1z: z-component of spin of object 1
+        :param chi2x: x-component of spin of object 2
+        :param chi2y: y-component of spin of object 2
+        :param chi2z: z-component of spin of object 2
         """
         q = m2 / m1  # It is assumed that q >= 1, so m2 >= m1.
         # fmt: off
@@ -200,6 +220,12 @@ class PN_p_t:
         """
         Finally, sum the expressions for a_k to construct p_t as prescribed:
         p_t = q/(sqrt(r)*(1+q)^2) (1 + sum_{k=2}^7 (a_k/r^{k/2}))
+
+        :param m1: mass of object 1
+        :param m2: mass of object 2
+        :param chi1U: spin of object 1
+        :param chi2U: spin of object 2
+        :param r: radius of separation
         """
         q = m2 / m1  # It is assumed that q >= 1, so m2 >= m1.
         a = ixp.zerorank1(dimension=10)
