@@ -243,7 +243,7 @@ class PN_p_t:
         a[5] = self.a_5
         a[6] = self.a_6
         a[7] = self.a_7
-        self.p_t = 1  # Term prior to the sum in parentheses
+        self.p_t = sp.sympify(1)  # Term prior to the sum in parentheses
         for k in range(8):
             self.p_t += a[k] / r ** div(k, 2)
         self.p_t *= q / (1 + q) ** 2 * 1 / r ** div(1, 2)
