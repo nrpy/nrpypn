@@ -1,4 +1,4 @@
-# NRPyPN: Validated Post-Newtonian Expressions for Binary Black Hole Initial Data
+# NRPyPN: Validated Post-Newtonian Expressions for Numerical Relativity
 
 ## Author
 Zachariah B. Etienne (https://etienneresearch.com)

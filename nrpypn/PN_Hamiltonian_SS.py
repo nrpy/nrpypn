@@ -5,9 +5,7 @@ generates spin-spin coupling pieces of the
 post-Newtonian (PN) Hamiltonian, up to and
 including 3PN order.
 
-Core functions:
-
-Author:  Zach Etienne
+Author:  Zachariah B. Etienne
          zachetie **at** gmail **dot* com
 """
 from typing import List, cast

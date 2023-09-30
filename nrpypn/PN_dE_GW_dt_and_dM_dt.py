@@ -5,13 +5,7 @@ generates dE_GW/dt at highest known
 post-Newtonian order (as of 2015, at
 least).
 
-Core functions:
-dE_GW_dt_OBKPSS2015_consts(m1,m2, n12U, S1U,S2U):
-      Define constants used in the dE_GW/dt expression.
-f_dE_GW_dt(mOmega, m1,m2, n12U, S1U,S2U):
-      Compute dE_GW_dt and store to global variable of the same name.
-
-Author:  Zach Etienne
+Author:  Zachariah B. Etienne
          zachetie **at** gmail **dot* com
 """
 from typing import List, Tuple, cast

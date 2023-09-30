@@ -5,18 +5,7 @@ generates spin-orbit coupling pieces of the
 post-Newtonian (PN) Hamiltonian, up to and
 including 3.5PN order.
 
-Core functions:
-f_H_SO_2p5PN(m1,m2, n12U,n21U, S1U, S2U, p1U,p2U, r12):
-      Compute H_SO_1p5PN and store to global variable
-                    of the same name.
-f_H_SO_2p5PN(m1,m2, n12U,n21U, S1U, S2U, p1U,p2U, r12):
-      Compute H_SO_2p5PN and store to global variable
-                    of the same name.
-f_H_SO_3p5PN(m1,m2, n12U,n21U, S1U, S2U, p1U,p2U, r12):
-      Compute H_SO_3p5PN and store to global variable
-                    of the same name.
-
-Author:  Zach Etienne
+Author:  Zachariah B. Etienne
          zachetie **at** gmail **dot* com
 """
 from typing import List, cast

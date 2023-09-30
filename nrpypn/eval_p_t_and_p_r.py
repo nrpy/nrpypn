@@ -6,7 +6,7 @@ post-Newtonian expressions into SymPy/NRPy+
 
 Basic functions:
 
-Author:  Zach Etienne
+Author:  Zachariah B. Etienne
          zachetie **at** gmail **dot* com
 """
 import sys

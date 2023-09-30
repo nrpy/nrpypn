@@ -75,6 +75,7 @@ disable=too-many-arguments,         # ADDED: no sane alternative to many argumen
         use-maxsplit-arg,           # ADDED: suggestion just clutters the code.
         too-many-instance-attributes, # ADDED: dumb class warning
         too-few-public-methods,     # ADDED: dumb class warning
+        no-self-use,                # ADDED: lots of false positives with Python 3.6ish
         raw-checker-failed,
         bad-inline-option,
         locally-disabled,

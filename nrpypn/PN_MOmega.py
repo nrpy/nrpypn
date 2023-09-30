@@ -1,22 +1,17 @@
 """
-# As documented in the NRPyPN notebook
-# PN-MOmega.ipynb, this Python script
-# generates the expression for the orbital
-# angular frequency M*Omega up to and
-# including terms at 3.5PN order.
-# It largely follows the expression of
-#  Ramos-Buades, Husa, and Pratten (2018)
-#    https://arxiv.org/abs/1810.00036
-# but fixes obvious typos in the given
-# equation.
+As documented in the NRPyPN notebook
+PN-MOmega.ipynb, this Python script
+generates the expression for the orbital
+angular frequency M*Omega up to and
+including terms at 3.5PN order.
+It largely follows the expression of
+ Ramos-Buades, Husa, and Pratten (2018)
+   https://arxiv.org/abs/1810.00036
+but fixes obvious typos in the given
+equation.
 
-# Core functions:
-# f_MOmega(m1,m2, chi1U,chi2U, r)
-#       Compute MOmega and store to
-#       global variable of the same name.
-
-# Author:  Zach Etienne
-#          zachetie **at** gmail **dot* com
+Author:  Zachariah B. Etienne
+         zachetie **at** gmail **dot* com
 """
 from typing import List, cast
 import sympy as sp  # SymPy: The Python computer algebra package upon which NRPy+ depends

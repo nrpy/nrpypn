@@ -11,12 +11,7 @@ but validates against the relevant equation
   in Healy, Lousto, Nakano, and Zlochower (2017)
    https://arxiv.org/abs/1702.00872
 
-Core functions:
-f_p_t(m1,m2, chi1U,chi2U, r)
-      Compute p_t and store to
-      global variable of the same name.
-
-Author:  Zach Etienne
+Author:  Zachariah B. Etienne
          zachetie **at** gmail **dot* com
 """
 from typing import List, cast

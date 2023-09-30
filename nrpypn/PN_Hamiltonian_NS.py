@@ -4,7 +4,7 @@ PN-Hamiltonian-Nonspinning.ipynb, this Python script
 generates nonspinning pieces of the post-Newtonian (PN)
 Hamiltonian, up to and including third PN order.
 
-Author:  Zach Etienne
+Author:  Zachariah B. Etienne
          zachetie **at** gmail **dot* com
 """
 

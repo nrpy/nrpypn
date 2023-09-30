@@ -10,7 +10,7 @@ cross(a,b): 3-vector cross product
 div(a,b): a shortcut for SymPy's sp.Rational(a,b), to declare rational numbers
 num_eval(expr): Numerically evaluates NRPyPN expressions
 
-Author:  Zach Etienne
+Author:  Zachariah B. Etienne
          zachetie **at** gmail **dot* com
 """
 from typing import List, cast, Optional
