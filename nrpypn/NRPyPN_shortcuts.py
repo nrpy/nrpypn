@@ -20,10 +20,10 @@ import nrpy.indexedexp as ixp  # NRPy+: Symbolic indexed expression (e.g., tenso
 # Step 1: Declare several global variables used
 #         throughout NRPyPN
 m1, m2 = sp.symbols("m1 m2", real=True)
-S1U = ixp.declarerank1("S1U")
-S2U = ixp.declarerank1("S2U")
-pU = ixp.declarerank1("pU")
-nU = ixp.declarerank1("nU")
+S1U = cast(List[sp.Expr], ixp.declarerank1("S1U"))
+S2U = cast(List[sp.Expr], ixp.declarerank1("S2U"))
+pU = cast(List[sp.Expr], ixp.declarerank1("pU"))
+nU = cast(List[sp.Expr], ixp.declarerank1("nU"))
 
 drdt = sp.symbols("drdt", real=True)
 Pt, Pr = sp.symbols("Pt Pr", real=True)
@@ -35,8 +35,8 @@ Pt, Pr = sp.symbols("Pt Pr", real=True)
 #   well justified. It should be obvious which is which
 #   throughout NRPyPN.
 r, q = sp.symbols("r q", real=True)
-chi1U = ixp.declarerank1("chi1U")
-chi2U = ixp.declarerank1("chi2U")
+chi1U = cast(List[sp.Expr], ixp.declarerank1("chi1U"))
+chi2U = cast(List[sp.Expr], ixp.declarerank1("chi2U"))
 
 # Euler-Mascheroni gamma constant:
 gamma_EulerMascheroni = sp.EulerGamma
@@ -170,50 +170,3 @@ def num_eval(
         .subs(sp.pi, sp.N(sp.pi))
         .subs(gamma_EulerMascheroni, sp.N(sp.EulerGamma)),
     )
-
-
-# import nrpypn.PN_p_t as pt
-# import nrpypn.PN_p_r as pr
-
-# Shortcut function to just evaluate P_t and P_r
-#  -= Inputs =-
-#  * qmassratio: mass ratio q>=1
-#  * nr: Orbital separation (total coordinate distance between black holes)
-#  * nchi1x,nchi1y,nchi1z: dimensionless spin vector for BH 1
-#  * nchi2x,nchi2y,nchi2z: dimensionless spin vector for BH 2
-#  -= Outputs =-
-# The numerical values for
-#  * P_t: the tangential momentum
-#  * P_r: the radial momentum
-# def eval__P_t__and__P_r(qmassratio, nr, nchi1x, nchi1y, nchi1z, nchi2x, nchi2y, nchi2z):
-#     # Compute p_t, the tangential component of momentum
-#     pt.f_p_t(m1, m2, chi1U, chi2U, r)
-#
-#     # Compute p_r, the radial component of momentum
-#     pr.f_p_r(m1, m2, n12U, n21U, chi1U, chi2U, S1U, S2U, p1U, p2U, r)
-#
-#     nPt = num_eval(
-#         pt.p_t,
-#         qmassratio=qmassratio,
-#         nr=nr,
-#         nchi1x=nchi1x,
-#         nchi1y=nchi1y,
-#         nchi1z=nchi1z,
-#         nchi2x=nchi2x,
-#         nchi2y=nchi2y,
-#         nchi2z=nchi2z,
-#     )
-#
-#     nPr = num_eval(
-#         pr.p_r,
-#         qmassratio=qmassratio,
-#         nr=nr,
-#         nchi1x=nchi1x,
-#         nchi1y=nchi1y,
-#         nchi1z=nchi1z,
-#         nchi2x=nchi2x,
-#         nchi2y=nchi2y,
-#         nchi2z=nchi2z,
-#         nPt=nPt,
-#     )
-#     return nPt, nPr

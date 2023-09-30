@@ -57,3 +57,5 @@ if [ ${#failed_tests[@]} -ne 0 ]; then
   echo "The following tests failed: ${failed_tests[*]}"
   exit 1
 fi
+
+python -c "import nrpypn.eval_p_t_and_p_r as ev; ev.test_results_against_trusted()"

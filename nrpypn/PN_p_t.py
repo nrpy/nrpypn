@@ -56,6 +56,8 @@ class PN_p_t:
         self.a_6: sp.Expr = sp.sympify(0)
         self.a_7: sp.Expr = sp.sympify(0)
 
+        self.p_t: sp.Expr = sp.sympify(0)
+
         self.f_p_t(m1, m2, chi1U, chi2U, r)
 
     #################################
