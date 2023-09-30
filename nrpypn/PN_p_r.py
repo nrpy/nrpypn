@@ -295,27 +295,29 @@ if __name__ == "__main__":
     in_p1U: List[sp.Expr] = cast(List[sp.Expr], ixp.declarerank1("p1U"))
     in_p2U: List[sp.Expr] = cast(List[sp.Expr], ixp.declarerank1("p2U"))
     in_nU: List[sp.Expr] = cast(List[sp.Expr], ixp.declarerank1("nU"))
-    p_r = PN_p_r(
-        in_m1,
-        in_m2,
-        in_n12U,
-        in_n21U,
-        in_chi1U,
-        in_chi2U,
-        in_S1U,
-        in_S2U,
-        in_p1U,
-        in_p2U,
-        in_r12,
-    )
-    results_dict = ve.process_dictionary_of_expressions(
-        p_r.__dict__, fixed_mpfs_for_free_symbols=True
-    )
-    ve.compare_or_generate_trusted_results(
-        os.path.abspath(__file__),
-        os.getcwd(),
-        # File basename. If this is set to "trusted_module_test1", then
-        #   trusted results_dict will be stored in tests/trusted_module_test1.py
-        f"{os.path.splitext(os.path.basename(__file__))[0]}",
-        results_dict,
-    )
+    for Alternative in [False, True]:
+        p_r = PN_p_r(
+            in_m1,
+            in_m2,
+            in_n12U,
+            in_n21U,
+            in_chi1U,
+            in_chi2U,
+            in_S1U,
+            in_S2U,
+            in_p1U,
+            in_p2U,
+            in_r12,
+            use_alternative_approach_for_p_r=Alternative,
+        )
+        results_dict = ve.process_dictionary_of_expressions(
+            p_r.__dict__, fixed_mpfs_for_free_symbols=True
+        )
+        ve.compare_or_generate_trusted_results(
+            os.path.abspath(__file__),
+            os.getcwd(),
+            # File basename. If this is set to "trusted_module_test1", then
+            #   trusted results_dict will be stored in tests/trusted_module_test1.py
+            f"{os.path.splitext(os.path.basename(__file__))[0]}_Alternative{Alternative}",
+            results_dict,
+        )
