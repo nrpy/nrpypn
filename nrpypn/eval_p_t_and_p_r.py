@@ -9,7 +9,6 @@ Basic functions:
 Author:  Zachariah B. Etienne
          zachetie **at** gmail **dot* com
 """
-import sys
 from typing import Tuple, Dict
 from collections import namedtuple
 

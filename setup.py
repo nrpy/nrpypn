@@ -9,12 +9,10 @@ Instructions for uploading latest release to PyPI:
     rm -rf build dist && python setup.py sdist bdist_wheel && twine check dist/*
     twine upload dist/*
 """
-
 import os
 import sys
 from pathlib import Path
 from typing import List
-import subprocess
 from setuptools import setup, find_packages  # type: ignore
 
 # pylint: disable=consider-using-f-string
