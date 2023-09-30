@@ -1,4 +1,4 @@
-# NRPyPN: Validated Post-Newtonian Expressions for Input into TwoPunctures, Wolfram Mathematica, SymPy, or Highly-Optimized C Codes
+# NRPyPN: Validated Post-Newtonian Expressions for Binary Black Hole Initial Data
 
 ## Author
 Zachariah B. Etienne (https://etienneresearch.com)
@@ -39,14 +39,13 @@ Class. Quant. Grav. 34 (2017) 14, 145011
 
 Prerequisites:
 
-* Python 3.6+ preferred, though earlier versions are supported
+* Python 3.6+
 * pip, the Python package manager, which should come with Python.
-* (*Optional*) Pandoc (https://pandoc.org/), to enable PDF conversion of NRPyPN notebooks
 
 Python packages:
 
 * SymPy 1.2+
-* Jupyter
+* NRPy+ 2.0+
 
 ### Quick install from the command line (bash shell)
 
@@ -54,27 +53,18 @@ Python packages:
 
 python3 -m venv nrpyvirtualenv
 source nrpyvirtualenv/bin/activate
-pip install -U sympy jupyter
+pip install nrpypn
 
-* Next navigate to Cactus/arrangements/EinsteinInitialData/NRPyPN, and run:
+* Then run the script
 
-jupyter notebook
+python3 nrpypn.quasicirc
 
-The NRPyPN.ipynb notebook both contains the Table of Contents and provides
-a simple interface for generating quasicircular 
-
-
-## Using NRPyPN in the Einstein Toolkit, with TwoPunctures
-
-1. Follow the above installation instructions, launch Jupyter, then open NRPyPN.ipynb
-2. Scroll down to the bottom of NRPyPN.ipynb and insert the desired black hole binary parameters
-3. Click the "fast-forward" button at the top of the Jupyter notebook, then click "Restart and run all cells"
-4. The PN tangential and radial momenta, for insertion into TwoPunctures, will be output at the bottom.
+The help message provides all the instructions needed.
 
 ## License:
 BSD 2-Clause
 
-Copyright (c) 2020, Zachariah Etienne
+Copyright (c) 2023, Zachariah Etienne
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -105,10 +95,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 @misc{NRPyPN,
  author       = {Etienne, Zachariah B.},
- title        = {NRPyPN: Validated Post-Newtonian Expressions for Input into Wolfram Mathematica, SymPy, or Highly Optimized C Codes},
- month        = nov,
- year         = 2020,
- url          = {https://github.com/zachetienne/nrpytutorial/blob/master/NRPyPN/}
+ title        = {NRPyPN: Validated Post-Newtonian Expressions for Binary Black Hole Initial Data},
+ month        = sep,
+ year         = 2023,
+ url          = {https://github.com/nrpy/nrpypn/}
 }
 
 ## Suggested Citation
