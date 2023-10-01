@@ -80,6 +80,9 @@ if __name__ == "__main__":
         long_description_content_type="text/markdown",
         python_requires=">=3.6",
         packages=find_packages(),
+        package_data={
+            "nrpypn": ["py.typed"],
+        },
         classifiers=[
             "License :: OSI Approved :: BSD License",
             "Operating System :: OS Independent",

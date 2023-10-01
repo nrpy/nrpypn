@@ -47,17 +47,21 @@ Python packages:
 * SymPy 1.2+
 * NRPy+ 2.0+
 
-### Quick install from the command line (bash shell)
+### Quick Install from the Command Line (Bash Shell)
 
-* First set up a virtual environment:
+1. **First, set up a virtual environment:**
 
-python3 -m venv nrpyvirtualenv
-source nrpyvirtualenv/bin/activate
-pip install nrpypn
+    ```bash
+    python3 -m venv nrpyvirtualenv
+    source nrpyvirtualenv/bin/activate
+    pip install nrpypn
+    ```
 
-* Then run the script
+2. **Then run the script:**
 
-python3 nrpypn.quasicirc
+    ```bash
+    python3 -m nrpypn.quasicirc
+    ```
 
 The help message provides all the instructions needed.
 
