@@ -5,6 +5,11 @@ To install the nrpypn package, navigate to this directory and execute:
 
 This will install nrpypn and its required dependencies.
 
+Instructions for creating the new GitHub release:
+    git tag -a v2.0.2 -m "NRPyPN 2.0.2"
+    git push origin main
+    git push origin v2.0.2
+
 Instructions for uploading latest release to PyPI:
     rm -rf build dist && python setup.py sdist bdist_wheel && twine check dist/*
     twine upload dist/*
