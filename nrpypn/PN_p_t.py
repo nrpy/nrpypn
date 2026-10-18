@@ -10,6 +10,8 @@ This is an implementation of the equations of
 but validates against the relevant equation
   in Healy, Lousto, Nakano, and Zlochower (2017)
    https://arxiv.org/abs/1702.00872
+The cubic-in-spin terms of a_7 differ from those
+printed in the former; see p_t__a_7.
 
 Author:  Zachariah B. Etienne
          zachetie **at** gmail **dot* com
@@ -172,6 +174,18 @@ class PN_p_t:
          Ramos-Buades, Husa, and Pratten (2018)
            https://arxiv.org/abs/1810.00036
 
+        The cubic-in-spin terms follow from PN_Hamiltonian_SSS.py, in which the m1/m2 block of
+        Eq. 3.12 of Levi and Steinhoff (2015) has coefficient -9/4. The a_7 printed in the paper
+        cited above, and used in the nrpytutorial and NRPyPN 2.0.1, corresponds to -3/2 there;
+        the history of that discrepancy is recorded in PN_Hamiltonian_SSS.py. The a_7 below
+        minus that a_7 is
+        15 q B / (8 (q+1)^4), with
+          B = 2 chi1x^2 chi2z + 2 chi1x chi1z chi2x - chi1y^2 chi2z - chi1z^2 chi2z
+              + q^2 (2 chi1x chi2x chi2z + 2 chi1z chi2x^2 - chi1z chi2y^2 - chi1z chi2z^2),
+        which changes p_t by up to about 7.7e-5 of p_t for 1 <= q <= 8, |chi1|, |chi2| <= 0.9,
+        r >= 10 (the largest change found by a numerical search is 7.71e-5, at q = 2.81, r = 10,
+        |chi1| = |chi2| = 0.9; it is not proved to be the global maximum).
+
         :param m1: mass of object 1
         :param m2: mass of object 2
         :param chi1x: x-component of spin of object 1
@@ -186,20 +200,20 @@ class PN_p_t:
         self.a_7 = (+5*(4*q+1)*q**3*chi2x**2*chi2z/(2*(q+1)**4)
                     -5*(4*q+1)*q**3*chi2y**2*chi2z/(8*(q+1)**4)
                     -5*(4*q+1)*q**3*chi2z**3      /(8*(q+1)**4)
-                    +chi1x*(+15*(2*q+1)*q**2*chi2x*chi2z/(4*(q+1)**4)
-                            +15*(1*q+2)*q   *chi2x*chi1z/(4*(q+1)**4))
+                    +chi1x*(+15*(3*q+1)*q**2*chi2x*chi2z/(4*(q+1)**4)
+                            +15*(1*q+3)*q   *chi2x*chi1z/(4*(q+1)**4))
                     +chi1y*(+15*q**2*chi2y*chi1z/(4*(q+1)**4)
                             +15*q**2*chi2y*chi2z/(4*(q+1)**4))
-                    +chi1z*(+15*q**2*(2*q+3)*chi2x**2/(4*(q+1)**4)
-                            -15*q**2*(  q+2)*chi2y**2/(4*(q+1)**4)
-                            -15*q**2        *chi2z**2/(4*(q+1)**3)
+                    +chi1z*(+45*q**2        *chi2x**2/(4*(q+1)**3)
+                            -15*q**2*(3*q+4)*chi2y**2/(8*(q+1)**4)
+                            -15*q**2*(3*q+2)*chi2z**2/(8*(q+1)**4)
                             -(103*q**5 + 145*q**4 - 27*q**3 + 252*q**2 + 670*q + 348)/(32*(q+1)**6))
                     -(+348*q**5 + 670*q**4 + 252*q**3 - 27*q**2 + 145*q + 103)*q*chi2z/(32*(q+1)**6)
                     +chi1x**2*(+5*(q+4)*chi1z/(2*(q+1)**4)
-                               +15*q*(3*q+2)*chi2z/(4*(q+1)**4))
+                               +45*q*chi2z/(4*(q+1)**3))
                     +chi1y**2*(-5*(q+4)*chi1z/(8*(q+1)**4)
-                               -15*q*(2*q+1)*chi2z/(4*(q+1)**4))
-                    -15*q*chi1z**2*chi2z/(4*(q+1)**3)
+                               -15*q*(4*q+3)*chi2z/(8*(q+1)**4))
+                    -15*q*(2*q+3)*chi1z**2*chi2z/(8*(q+1)**4)
                     -5*(q+4)*chi1z**3/(8*(q+1)**4))
         # fmt: on
 

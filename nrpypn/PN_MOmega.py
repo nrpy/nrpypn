@@ -8,7 +8,8 @@ It largely follows the expression of
  Ramos-Buades, Husa, and Pratten (2018)
    https://arxiv.org/abs/1810.00036
 but fixes obvious typos in the given
-equation.
+equation and corrects the coefficient of the
+cubic-in-spin terms of a_7; see MOmega__a_7.
 
 Author:  Zachariah B. Etienne
          zachetie **at** gmail **dot* com
@@ -130,26 +131,39 @@ class PN_MOmega:
         chi2y: sp.Expr,
         chi2z: sp.Expr,
     ) -> None:
-        """Construct term a_7, from Eq A1 of  Ramos-Buades, Husa, and Pratten (2018) https://arxiv.org/abs/1810.00036"""
+        """
+        Construct term a_7, from Eq A1 of  Ramos-Buades, Husa, and Pratten (2018)
+          https://arxiv.org/abs/1810.00036
+
+        The cubic-in-spin terms follow from PN_Hamiltonian_SSS.py, in which the m1/m2 block of
+        Eq. 3.12 of Levi and Steinhoff (2015) has coefficient -9/4. The a_7 printed in the paper
+        cited above, and used in the nrpytutorial and NRPyPN 2.0.1, corresponds to -3/2 there.
+        The nrpytutorial notebook PN-MOmega.ipynb also holds a third a_7, labelled as taken
+        directly from the authors' Mathematica notebook, with the same coefficient (that
+        notebook itself was not available for this check), so the nrpytutorial's validation
+        against that third a_7 shares the coefficient; the history of the discrepancy is
+        recorded in PN_Hamiltonian_SSS.py. The a_7 below minus that a_7 is
+        9 q B / (8 (q+1)^4), with B as defined in PN_p_t.py (p_t__a_7).
+        """
         q = m2 / m1  # It is assumed that q >= 1, so m2 >= m1.
         # fmt: off
         self.a_7 = (+3*(4*q+1)*q**3*chi2x**2*chi2z/(2*(q+1)**4)
                -3*(4*q+1)*q**3*chi2y**2*chi2z/(8*(q+1)**4)
                -3*(4*q+1)*q**3*chi2z**3      /(8*(q+1)**4)
-               +chi1x*(+9*(2*q+1)*q**2*chi2x*chi2z/(4*(q+1)**4)
-                       +9*(1*q+2)*q   *chi2x*chi1z/(4*(q+1)**4))
+               +chi1x*(+9*(3*q+1)*q**2*chi2x*chi2z/(4*(q+1)**4)
+                       +9*(1*q+3)*q   *chi2x*chi1z/(4*(q+1)**4))
                +chi1y*(+9*q**2*chi2y*chi1z/(4*(q+1)**4)
                        +9*q**2*chi2y*chi2z/(4*(q+1)**4))
-               +chi1z*(+9*q**2*(2*q+3)*chi2x**2/(4*(q+1)**4)
-                       -9*q**2*(  q+2)*chi2y**2/(4*(q+1)**4)
-                       -9*q**2        *chi2z**2/(4*(q+1)**3)
+               +chi1z*(+27*q**2        *chi2x**2/(4*(q+1)**3)
+                       -9*q**2*(3*q+4)*chi2y**2/(8*(q+1)**4)
+                       -9*q**2*(3*q+2)*chi2z**2/(8*(q+1)**4)
                        -(135*q**5 + 385*q**4 + 363*q**3 + 377*q**2 + 387*q + 168)/(32*(q+1)**6))
                -(+168*q**5 + 387*q**4 + 377*q**3 + 363*q**2 + 385*q + 135)*q*chi2z/(32*(q+1)**6)
                +chi1x**2*(+3*(q+4)*chi1z/(2*(q+1)**4)
-                          +9*q*(3*q+2)*chi2z/(4*(q+1)**4))
+                          +27*q*chi2z/(4*(q+1)**3))
                +chi1y**2*(-3*(q+4)*chi1z/(8*(q+1)**4)
-                          -9*q*(2*q+1)*chi2z/(4*(q+1)**4))
-               -9*q*chi1z**2*chi2z/(4*(q+1)**3)
+                          -9*q*(4*q+3)*chi2z/(8*(q+1)**4))
+               -9*q*(2*q+3)*chi1z**2*chi2z/(8*(q+1)**4)
                -3*(q+4)*chi1z**3/(8*(q+1)**4))
         # fmt: on
 

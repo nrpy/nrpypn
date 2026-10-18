@@ -34,8 +34,8 @@ class PN_Hamiltonian_SO:
 
     :param m1: Mass of the first object
     :param m2: Mass of the second object
-    :param n12U: Unit vector from object 1 to object 2
-    :param n21U: Unit vector from object 2 to object 1
+    :param n12U: Unit vector (x1 - x2)/r12, from object 2 to object 1
+    :param n21U: Unit vector (x2 - x1)/r12, from object 1 to object 2
     :param S1U: Spin vector of object 1
     :param S2U: Spin vector of object 2
     :param p1U: Momentum vector of object 1
@@ -217,7 +217,18 @@ class PN_Hamiltonian_SO:
         p2U: List[sp.Expr],
         r12: sp.Expr,
     ) -> List[sp.Expr]:
-        """3.5PN H_SO:  Omega_1, part 3:"""
+        """
+        3.5PN H_SO:  Omega_1, part 3:
+
+        The bracket ends with +(n12.p2)(p2.p2)/(m1 m2^3), as printed in all versions of
+        Hartung and Steinhoff (2011), https://arxiv.org/abs/1104.3079. History of the discrepancy:
+        the nrpytutorial (PN_Hamiltonian_SO.py and the first transcription in
+        PN-Hamiltonian-Spin-Orbit.ipynb) lacks this term, while the second transcription in the
+        same notebook ("pt3v2") has it. The notebook compares the two with p2 = -p1, where
+        (p1 x p2) vanishes, so the difference was not detected. NRPyPN 2.0.1 inherited the
+        omission. The term is proportional to (p1 x p2) and vanishes in the centre-of-mass
+        frame, so p_t, M*Omega and p_r are unchanged.
+        """
         Omega1 = ixp.zerorank1()
         # fmt: off
         for i in range(3):
@@ -225,7 +236,8 @@ class PN_Hamiltonian_SO:
                            +dot(p1U,p1U)*dot(n12U,p2U)/(m1**3*m2)
                            +27*dot(n12U,p1U)*dot(n12U,p2U)**2/(16*m1**2*m2**2)
                            -dot(n12U,p2U)*dot(p1U,p2U)/(8*m1**2*m2**2)
-                           -5*dot(n12U,p1U)*dot(p2U,p2U)/(16*m1**2*m2**2))*cross(p1U,p2U)[i])/r12**2
+                           -5*dot(n12U,p1U)*dot(p2U,p2U)/(16*m1**2*m2**2)
+                           +dot(n12U,p2U)*dot(p2U,p2U)/(m1*m2**3))*cross(p1U,p2U)[i])/r12**2
         # fmt: on
         return Omega1
 

@@ -10,7 +10,7 @@ Toolkit. Also special thanks to Antoni Ramos-Buades for sharing
 the Mathematica notebooks that the paper
 "Simple procedures to reduce eccentricity of binary black hole simulations"
 Phys. Rev. D 99, 023003 (2019)
-used, so that expressions in NRPyPN could be validated.
+used, which served as a reference when expressions in NRPyPN were checked.
 
 ## Purpose
 
@@ -33,6 +33,30 @@ and
 Healy, Lousto, Nakano, and Zlochower,
 https://arxiv.org/abs/1702.00872,
 Class. Quant. Grav. 34 (2017) 14, 145011 
+
+## Validation
+
+Expressions in NRPyPN were compared with the corresponding expressions in the
+references above and, for M*Omega and p_r, through the nrpytutorial, with
+transcriptions that the nrpytutorial labels as taken from the Mathematica
+notebooks of Ramos-Buades, Husa, and Pratten. Agreement with a reference shows that an
+expression was transcribed as that reference prints it; it does not show that
+the printed expression is correct, and a comparison between two transcriptions
+of the same printed expression cannot detect an error in that expression.
+
+Relative to NRPyPN 2.0.1, four expressions inherited from the nrpytutorial were
+corrected. The comparisons with the references had not detected them:
+
+* the coefficient of the m1/m2 block of the cubic-in-spin Hamiltonian
+  (`PN_Hamiltonian_SSS.py`), and through it the cubic-in-spin terms of a_7 in
+  `PN_p_t.py` and `PN_MOmega.py` and of the closed-form p_r in `PN_p_r.py`;
+* the momentum in one spin-spin term of the 3PN Hamiltonian
+  (`PN_Hamiltonian_SS.py`);
+* one term of the 3.5PN spin-orbit Hamiltonian (`PN_Hamiltonian_SO.py`);
+* the signs of in-plane spin terms in the closed-form p_r (`PN_p_r.py`).
+
+The docstring of each affected module records the discrepancy, its history in
+the nrpytutorial, and, where known, its effect on the results.
 
 
 ## Installation instructions

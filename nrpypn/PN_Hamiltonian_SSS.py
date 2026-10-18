@@ -3,7 +3,9 @@ As documented in the NRPyPN notebook
 PN-Hamiltonian-SSS.ipynb, this Python script
 generates spin-spin-spin coupling pieces of the
 post-Newtonian (PN) Hamiltonian, up to and
-including 3PN order.
+including the leading-order cubic-in-spin terms
+(3.5PN for rapidly rotating bodies, labelled
+3PN in the nrpytutorial and in the names here).
 
 Author:  Zachariah B. Etienne
          zachetie **at** gmail **dot* com
@@ -20,14 +22,29 @@ from nrpypn.NRPyPN_shortcuts import div, dot, cross
 #################################
 class PN_Hamiltonian_SSS:
     """
-    Implement 3PN spin-spin-spin term, from Eq. 3.12 of
+    Implement the leading-order spin-spin-spin term (3.5PN for rapidly rotating bodies,
+            labelled 3PN in the nrpytutorial), from Eq. 3.12 of
             Levi and Steinhoff (2015):
          https://arxiv.org/abs/1410.2601
 
+    The block proportional to m1/m2 has coefficient -9/4, since it lies inside the 3/2 group
+      of Eq. 3.12. History of the discrepancy: the first version of this Hamiltonian in the
+      nrpytutorial (commit 981876f0, 2020-05-09) had the block inside the group; commit 61cb9fc8
+      (2020-05-10, "PN-Hamiltonian-SSS now fully validated") moved it outside the group in the
+      code (coefficient -3/2), and the code of the nrpytutorial notebooks and NRPyPN 2.0.1
+      carry that form. The reason for the move is not recorded in the commit message, patch or
+      notebook, and the validation recorded in the notebook (two hand transcriptions and
+      agreement with its own module) cannot detect it. The a_7 of Ramos-Buades, Husa, and
+      Pratten (2018) (https://arxiv.org/abs/1810.00036) corresponds to -3/2 as well, as does
+      the a_7 that the nrpytutorial notebook PN-MOmega.ipynb labels as taken from the authors'
+      Mathematica notebook.
+      Eq. 3.12 is not at fault. Eq. 2.13 of Hergt and Schaefer (https://arxiv.org/abs/0809.2208)
+      prints the prefactor 3 m2/(4 m1) where 3 m1/(4 m2), which reproduces Eq. 3.12, is needed.
+
     :param m1: Mass of the first object
     :param m2: Mass of the second object
-    :param n12U: Unit vector from the first to the second object
-    :param n21U: Unit vector from the second to the first object
+    :param n12U: Unit vector (x1 - x2)/r12, from the second to the first object
+    :param n21U: Unit vector (x2 - x1)/r12, from the first to the second object
     :param S1U: Spin vector of the first object
     :param S2U: Spin vector of the second object
     :param p1U: Momentum of the first object
@@ -62,7 +79,8 @@ class PN_Hamiltonian_SSS:
         p2U: List[sp.Expr],
         r12: sp.Expr,
     ) -> None:
-        """3PN spin-spin-spin term, from Eq. 3.12 of Levi and Steinhoff (2015):
+        """Leading-order spin-spin-spin term (3.5PN for rapidly rotating bodies, labelled 3PN
+        in the nrpytutorial), from Eq. 3.12 of Levi and Steinhoff (2015):
         https://arxiv.org/abs/1410.2601"""
 
         def f_H_SSS_3PN_pt(
@@ -86,7 +104,7 @@ class PN_Hamiltonian_SSS:
                                        -5*dot(S1U,nU)**2*dot(S2U,cross(nU,p1U))
                                        +dot(nU,cross(S1U,S2U))*( dot(S1U,p1U)
                                                                 -5*dot(S1U,nU)*dot(p1U,nU)))
-                            -3*m1/(2*m2)*(   dot(S1U,S1U)  *dot(S2U,cross(nU,p2U))
+                            -9*m1/(4*m2)*(   dot(S1U,S1U)  *dot(S2U,cross(nU,p2U))
                                           +2*dot(S1U,nU)   *dot(S2U,cross(S1U,p2U))
                                           -5*dot(S1U,nU)**2*dot(S2U,cross(nU,p2U)))
                             -dot(cross(S1U,nU),p2_minus_m2_over_4m1_p1)*(dot(S1U,S1U) - 5*dot(S1U,nU)**2))/(m1**2*r**4)

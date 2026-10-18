@@ -24,8 +24,8 @@ class PN_Hamiltonian_SS:
 
     :param m1: Mass of object 1.
     :param m2: Mass of object 2.
-    :param n12U: Unit vector from object 1 to object 2.
-    :param n21U: Unit vector from object 2 to object 1.
+    :param n12U: Unit vector (x1 - x2)/r12, from object 2 to object 1.
+    :param n21U: Unit vector (x2 - x1)/r12, from object 1 to object 2.
     :param S1U: Spin vector of object 1.
     :param S2U: Spin vector of object 2.
     :param p1U: Momentum vector of object 1.
@@ -99,6 +99,15 @@ class PN_Hamiltonian_SS:
         3PN spin-spin S_1,S_2 coupling term, from Eq. 2.11 of
               Steinhoff, Hergt, and Sch\"afer (2008a)
                 https://arxiv.org/abs/0712.1716
+
+        The 3/(2 m2^2 r12^3) block contains S1.p2, as in Eq. 2.11. History of the discrepancy:
+          the nrpytutorial (PN-Hamiltonian-Spin-Spin.ipynb and PN_Hamiltonian_SS.py) displays S1.p2
+          in its equation but has S1.p1 in the code, in both of the transcriptions that it
+          compares with each other, so the comparison could not detect it. NRPyPN 2.0.1 inherited
+          S1.p1. The term has the explicit factor p2.n12, so it vanishes on circular orbits
+          together with its r and p_t derivatives, and p_t and M*Omega are unchanged; its first
+          and second p_r derivatives do not vanish, so it affects only the full-Hamiltonian
+          route to p_r.
         """
         # fmt: off
         H_SS_S1S2_3PN = (+div(3,2)*(dot(cross(p1U,S1U),n12U)*dot(cross(p2U,S2U),n12U))
@@ -118,7 +127,7 @@ class PN_Hamiltonian_SS:
                          -dot(S1U,n12U)*dot(S2U,p1U)*dot(p1U,n12U))*3/(2*m1**2*r12**3)
         H_SS_S1S2_3PN +=(-dot(cross(p2U,S2U),n12U)*dot(cross(p2U,S1U),n12U)
                          +dot(S1U,S2U)*dot(p2U,n12U)**2
-                         -dot(S2U,n12U)*dot(S1U,p1U)*dot(p2U,n12U))*3/(2*m2**2*r12**3)
+                         -dot(S2U,n12U)*dot(S1U,p2U)*dot(p2U,n12U))*3/(2*m2**2*r12**3)
         H_SS_S1S2_3PN +=( dot(S1U,S2U)-2*dot(S1U,n12U)*dot(S2U,n12U))*6*(m1+m2)/r12**4
         self.H_SS_S1S2_3PN = H_SS_S1S2_3PN
         # fmt: on

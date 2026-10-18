@@ -107,6 +107,10 @@ def test_results_against_trusted() -> None:
             "tr_p_r",
         ],
     )
+    # Trusted values of the cases with spin were regenerated after correcting the cubic-in-spin
+    #   Hamiltonian (Levi & Steinhoff, arXiv:1410.2601, Eq. 3.12), which changes p_t and p_r, and
+    #   the signs of the in-plane-spin groups of p_r, which change p_r of the cases with in-plane
+    #   spin. The S1.p2 slip in the 3PN S1S2 Hamiltonian does not change these values.
     case_dict: Dict[str, bbh_params] = {
         "Mass ratio q=2, chi1= (0,0,0); chi2=(-0.3535, 0.3535, 0.5), radial separation r=10.8": bbh_params(
             q=2.0,
@@ -118,7 +122,7 @@ def test_results_against_trusted() -> None:
             chi2y=0.3535,
             chi2z=0.5,
             tr_p_t=0.0793500403866190,
-            tr_p_r=0.0005426257166677216,
+            tr_p_r=0.0005456207958547835,
         ),
         "Mass ratio q=8, chi1= (0, 0, 0.5); chi2=(0, 0, 0.5), radial separation r=11": bbh_params(
             q=8.0,
@@ -129,8 +133,8 @@ def test_results_against_trusted() -> None:
             chi2x=0,
             chi2y=0,
             chi2z=0.5,
-            tr_p_t=0.0345503689803291,
-            tr_p_r=0.0000975735300199125,
+            tr_p_t=0.03455024367232329,
+            tr_p_r=0.00009757078773996347,
         ),
         "Mass ratio q=1.5, chi1= (0,0,-0.6); chi2=(0,0,0.6), radial separation r=10.8": bbh_params(
             q=1.5,
@@ -141,8 +145,8 @@ def test_results_against_trusted() -> None:
             chi2x=0,
             chi2y=0,
             chi2z=0.6,
-            tr_p_t=0.0868556558764586,
-            tr_p_r=0.0006770196671656516,
+            tr_p_t=0.08685599881198672,
+            tr_p_r=0.000677041836061852,
         ),
         "Mass ratio q=4, chi1= (0,0,-0.8); chi2=(0,0,0.8), radial separation r=11": bbh_params(
             q=4,
@@ -153,8 +157,8 @@ def test_results_against_trusted() -> None:
             chi2x=0,
             chi2y=0,
             chi2z=0.8,
-            tr_p_t=0.0558077537453816,
-            tr_p_r=0.0002511426409814753,
+            tr_p_t=0.05580876088970232,
+            tr_p_r=0.00025117768554259594,
         ),
         "Mass ratio q=1, chi1=chi2=(0,0,0), radial separation r=12": bbh_params(
             q=1,
@@ -177,8 +181,8 @@ def test_results_against_trusted() -> None:
             chi2x=-0.1,
             chi2y=0.4,
             chi2z=-0.26,
-            tr_p_t=0.10894035623063517,
-            tr_p_r=0.002093970161808933,
+            tr_p_t=0.1089395942089403,
+            tr_p_r=0.0020741500944494685,
         ),
     }
 

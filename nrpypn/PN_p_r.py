@@ -7,6 +7,8 @@ including terms at 3.5PN order.
 It largely follows the technique of
  Ramos-Buades, Husa, and Pratten (2018)
    https://arxiv.org/abs/1810.00036
+with two departures in the closed-form
+expression; see f_p_r.
 
 Author:  Zach Etienne
          zachetie **at** gmail **dot* com
@@ -34,7 +36,7 @@ class PN_p_r:
     Core class functions:
     f_dr_dt(Htot_xyplane_binary, m1,m2, n12U,n21U, chi1U,chi2U, S1U,S2U, p1U,p2U, r)
         Given Htot_xyplane_binary and other standard input parameters, compute
-        dr_dt = dr/dt and store to class variable of the same name.
+        dr_dt = -dr/dt (minus the radial velocity) and store to class variable of the same name.
 
     f_p_r_fullHam(m1,m2, n12U,n21U, chi1U,chi2U, S1U,S2U, p1U,p2U, r)
           Compute p_r using the full Hamiltonian, without truncating
@@ -149,7 +151,7 @@ class PN_p_r:
         Given Htot_xyplane_binary (computed
         above) and other standard input
         parameters, compute
-        dr_dt = dr/dt and store to class
+        dr_dt = -dr/dt (minus the radial velocity) and store to class
         variable of the same name.
         """
         # First compute p_t
@@ -168,11 +170,11 @@ class PN_p_r:
         dE_GW_dt_and_dM_dt = PN_dE_GW_dt_and_dM_dt(MOm.MOmega, m1, m2, n12U, S1U, S2U)
         dE_GW_dt_plus_dM_dt = dE_GW_dt_and_dM_dt.dE_GW_dt_plus_dM_dt
 
-        # Finally, compute dr/dt
+        # Finally, compute dr_dt = -dr/dt
         self.dr_dt = dE_GW_dt_plus_dM_dt / dHcirc_dr
 
     # Next we compute p_r as a function of dr_dt (unknown) and known quantities using
-    # p_r  approx [dr/dt - (partial_H/partial_{p_r})|_{p_r=0}] * [(partial^2_{H}/partial_{p_r^2})|_{p_r=0}]^{-1}
+    # p_r  approx [dr_dt - (partial_H/partial_{p_r})|_{p_r=0}] * [(partial^2_{H}/partial_{p_r^2})|_{p_r=0}]^{-1}
     def f_p_r_alternative__use_fullHam(
         self,
         m1: sp.Expr,
@@ -190,9 +192,9 @@ class PN_p_r:
         """
         Basic equation for p_r can be written in the
           form:
-         p_r  approx [dr/dt - (partial_H/partial_{p_r})|_{p_r=0}] * [(partial^2_{H}/partial_{p_r^2})|_{p_r=0}]^{-1},
-          where
-        dr/dt = [dE_{rm GW}/dt + dM/dt] * [dH_{circ} / dr]^{-1},
+         p_r  approx [dr_dt - (partial_H/partial_{p_r})|_{p_r=0}] * [(partial^2_{H}/partial_{p_r^2})|_{p_r=0}]^{-1},
+          where p_r is minus the outward radial momentum and
+        dr_dt = -dr/dt = [dE_{rm GW}/dt + dM/dt] * [dH_{circ} / dr]^{-1},
          and
         H_{circ} = Htot_xyplane_binary|_{p_r=0}
          -> [dH_{circ}(r,p_t(r)) / dr] = partial_{H(p_r=0)}/partial_r
@@ -230,9 +232,35 @@ class PN_p_r:
         """
         Ramos-Buades, Husa, and Pratten (2018)
           approach for computing p_r.
-        Transcribed from Eq 2.18 of
+        Transcribed from Eq 2.16 of
         Ramos-Buades, Husa, and Pratten (2018),
           https://arxiv.org/abs/1810.00036
+
+        Departures from the transcription, with their history:
+        * Cubic-in-spin coefficient. Four monomials of the r^(-4) group have the factors
+          (5q+3) and (3q+5) where the paper has (5q+2) and (2q+5), from the coefficient -9/4
+          of the m1/m2 block of the spin-spin-spin Hamiltonian (see PN_Hamiltonian_SSS.py,
+          which records the history; the paper, and the nrpytutorial notebook PN-p_r.ipynb,
+          whose displayed equation is taken from the paper's LaTeX source and which also holds
+          a third version labelled as taken from the authors' Mathematica notebook, all have
+          the factors (5q+2), (2q+5)).
+        * Sign of the in-plane-spin groups. Both groups (r^(-7/2) and r^(-4)) have the sign
+          that Hamilton's equation for the Hamiltonian of this module requires, with
+          dr_dt = (dE_GW/dt + dM/dt) / (dH_circ/dr) > 0 (minus the radial velocity), so that
+          the result agrees with the full-Hamiltonian route
+          (use_alternative_approach_for_p_r=True) through the orders kept. The nrpytutorial
+          (PN-p_r.ipynb and PN_p_r.py) has the opposite sign, as the paper's equation prints
+          it, while using the same positive dr_dt; this is probably a convention mismatch
+          that the tutorial did not catch (not verified against the paper's conventions).
+          The saved output of the tutorial's comparison of the two routes (PN-p_r.ipynb) is for
+          one random state (seed 0), with a relative difference of 3.9e-3 that the notebook
+          does not analyze; with these corrections the same state gives 8.6e-4. The tutorial's
+          comparison against Table V of the paper prints a good or not-good label for both
+          routes, decided by the full-Hamiltonian route alone: good if
+          |pub0 - full|/pub0 <= |pub0 - pub1|/pub1, where pub0 and pub1 are the printed
+          iteration-0 and iteration-1 values. It does not test the closed form and asserts
+          nothing. For Table V IDs 21-25 the printed iteration differences are 6.1e-5 to
+          8.3e-5, while this sign changes the closed form by 7.5e-7 to 5.9e-6.
         """
         q = m2 / m1  # It is assumed that q >= 1, so m2 >= m1.
         self.f_Htot_xyplane_binary(m1, m2, n12U, n21U, S1U, S2U, p1U, p2U, r)
@@ -245,14 +273,14 @@ class PN_p_r:
         chi2z = chi2U[2]
         # fmt: off
         p_r_num = (-self.dr_dt
-                   +(-(6*q+13)*q**2*chi1x*chi2y/(4*(q+1)**4)
-                     -(6*q+ 1)*q**2*chi2x*chi2y/(4*(q+1)**4)
-                     +chi1y*(-q*(   q+6)*chi1x/(4*(q+1)**4)
-                             -q*(13*q+6)*chi2x/(4*(q+1)**4)))/r**div(7,2)
-                   +(+chi1z*(+3*q   *(5*q+2)*chi1x*chi2y/(2*(q+1)**4)
-                             -3*q**2*(2*q+5)*chi2x*chi2y/(2*(q+1)**4))
-                     +chi1y*chi2z*(+3*q**2*(2*q+5)*chi2x/(2*(q+1)**4)
-                                   -3*q   *(5*q+2)*chi1x/(2*(q+1)**4)))/r**4)
+                   +(+(6*q+13)*q**2*chi1x*chi2y/(4*(q+1)**4)
+                     +(6*q+ 1)*q**2*chi2x*chi2y/(4*(q+1)**4)
+                     +chi1y*(+q*(   q+6)*chi1x/(4*(q+1)**4)
+                             +q*(13*q+6)*chi2x/(4*(q+1)**4)))/r**div(7,2)
+                   +(+chi1z*(-3*q   *(5*q+3)*chi1x*chi2y/(2*(q+1)**4)
+                             +3*q**2*(3*q+5)*chi2x*chi2y/(2*(q+1)**4))
+                     +chi1y*chi2z*(-3*q**2*(3*q+5)*chi2x/(2*(q+1)**4)
+                                   +3*q   *(5*q+3)*chi1x/(2*(q+1)**4)))/r**4)
         p_r_den = (-(q+1)**2/q - (-7*q**2-15*q-7)/(2*q*r)
                    -(47*q**4 + 229*q**3 + 363*q**2 + 229*q + 47)/(8*q*(q+1)**2*r**2)
                    -(+( 4*q**2 + 11*q + 12)*chi1z/(4*q*(q+1))
