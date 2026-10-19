@@ -3,7 +3,9 @@
 This repository is `nrpy/nrpypn`: SymPy implementations of post-Newtonian
 Hamiltonians, orbital frequency, energy and mass fluxes, and tangential and radial
 momenta for quasicircular binary black hole initial data. Start with the root
-[README](../README.md), then read the relevant modules and their reference notes.
+[knowledge base](../AGENTS.md), follow its branch routers to the sourced pages,
+and verify the relevant modules when a source changes. The project
+[README](../README.md) remains the package introduction.
 
 ## Working Rules
 
@@ -46,8 +48,10 @@ tests, packaging, or edits.
 | [CI workflow](../.github/workflows/main.yml), [standalone script](../.github/standalone_bash_script.sh), [Pylint configuration](../.pylintrc), [Python 3.6 configuration](../.pylintrc_python36) | Existing execution, formatting, typing, and lint checks. Inspect command effects before running scripts. |
 
 The `nrpy` package supplies indexed-expression helpers and expression validation.
-Do not import NRPy's infrastructure, generated C projects, or knowledge-base
-maintenance procedures into an NRPyPN task without an actual dependency.
+Do not import NRPy's infrastructure or generated C projects into an NRPyPN task
+without an actual dependency. NRPyPN's adopted KB conventions are governed by
+[KB Page Format](../wiki/SCHEMA.md) and [Workflows](../wiki/workflows.md); the
+frozen convention sources do not supply NRPyPN implementation facts.
 
 ## Scientific Standards
 
@@ -108,10 +112,13 @@ dependencies. Verify which `nrpy` is imported when a reference checkout is prese
 python -c 'import nrpy, sympy; print(nrpy.__file__); print(sympy.__version__)'
 ```
 
-For changed handwritten Python, the existing gates are module execution (including
+For changed handwritten Python, the required checks are module execution (including
 its doctests and expression comparisons where provided), Black, strict mypy with
-`--allow-untyped-calls`, and a Pylint score of at least 9.5 using the repository
-configuration. Inspect diagnostics as well as the score. Preserve the declared
+`--allow-untyped-calls`, and Pylint using the repository configuration. New
+handwritten Python files require **10.00/10.00**; existing handwritten files must
+not regress from their pre-change score, including a grandfathered score at or
+below `9.5`. The standalone script's configured floor of `9.5` does not lower
+these requirements. Inspect diagnostics as well as the score. Preserve the declared
 Python 3.6+ compatibility and CI's Python 3.6.7 exception for Black/mypy; use
 `.pylintrc_python36` for that interpreter. Report unavailable interpreters or tools
 as missing checks, not as passes.
@@ -141,9 +148,11 @@ physical-case regression in addition to the affected module checks:
 python -c 'from nrpypn.eval_p_t_and_p_r import test_results_against_trusted; test_results_against_trusted()'
 ```
 
-This checks tangential and radial momenta against the cases stored in the evaluator
-with relative tolerance `1e-13`. It is regression evidence, not an independent
-derivation. For CLI changes, also exercise argument handling and representative
+This calls the stored relative-error comparison with tolerance `1e-13`, but the
+comparison alone can accept NaN momenta. Require finite tangential and radial
+momenta for every case before interpreting its success as agreement. Use the
+finite-output wrapper in [Expression Regressions](../wiki/validation/expression-regressions.md#physical-case-momentum-regression)
+in the isolated copy. This is regression evidence, not an independent derivation. For CLI changes, also exercise argument handling and representative
 numerical input, starting with:
 
 ```bash

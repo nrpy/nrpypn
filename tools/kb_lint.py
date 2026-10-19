@@ -1,0 +1,1719 @@
+#!/usr/bin/env python3
+"""
+Mechanical lint checks for the markdown knowledge base.
+
+Author: Zachariah B. Etienne
+        zachetie **at** gmail **dot* com
+"""
+
+import argparse
+import os
+
+# Regexes are needed for Markdown link, heading, and table checks.
+import re
+import sys
+from collections import Counter, defaultdict, deque
+from pathlib import Path
+from typing import Deque, Dict, List, Match, NamedTuple, Optional, Set, Tuple
+from urllib.parse import unquote, urlparse
+
+ROOT = Path(__file__).resolve().parents[1]
+WIKI = ROOT / "wiki"
+RAW = ROOT / "raw"
+AGENTS = ROOT / "AGENTS.md"
+CATALOG = WIKI / "catalog.md"
+GLOSSARY = WIKI / "glossary.md"
+SOURCE_MAP = WIKI / "source-map.md"
+CONTRADICTIONS = WIKI / "contradictions.md"
+SOURCES = RAW / "SOURCES.md"
+RETIRED_OPERATION_OUTPUT = WIKI / "log.md"
+
+REQUIRED_LEAF_SECTIONS = ["Summary", "Detail", "Sources", "See Also"]
+SOURCE_MAP_COLUMNS = [
+    "Source or aggregate",
+    "Authority tier",
+    "Status",
+    "Ingest",
+    "Dependent pages",
+    "Covered subpaths",
+    "Known gaps",
+    "Next action",
+]
+SOURCE_AUTHORITY_TIERS = {
+    "primary-code",
+    "primary-test",
+    "generated-evidence",
+    "primary-doc",
+    "external-spec",
+    "background",
+}
+ROUTER_NAMES = {"index.md"}
+SUPPORT_PAGES = {
+    WIKI / "SCHEMA.md",
+    WIKI / "computational-physics-language.md",
+    WIKI / "workflows.md",
+    WIKI / "glossary.md",
+    WIKI / "catalog.md",
+    WIKI / "source-map.md",
+    WIKI / "contradictions.md",
+    WIKI / "lint" / "CHECKS.md",
+}
+EXEMPT_INDEX_DIRS = {WIKI / "lint"}
+SKIP_LINK_SCHEMES = {"http", "https", "mailto", "tel"}
+PAGE_STATUSES = {"confirmed", "provisional", "contested", "stale"}
+SOURCE_STATUSES = {"frozen", "living"}
+INGEST_STATES = {"registered", "partial", "ingested", "exact seed"}
+GLOBAL_HUB_NAMES = {
+    "SCHEMA.md",
+    "computational-physics-language.md",
+    "workflows.md",
+    "glossary.md",
+    "catalog.md",
+    "source-map.md",
+    "contradictions.md",
+}
+ROOT_COORDINATION_RE = re.compile(
+    r"^(?:plan|tasks?)(?:[0-9]+)?(?:[-_][a-z0-9]+)*[.]md$"
+)
+ROOT_PROHIBITED_ARTIFACT_SEGMENT_RE = re.compile(
+    r"(?:^|[._-])(?:audit|scan|report|log|latest|token|rank|ranking)s?[0-9]*"
+    r"(?:$|[._-])",
+    re.IGNORECASE,
+)
+# Volatile facts do not belong in the authored KB. Stable scientific
+# cardinalities and identifier names remain valid; inventory counts and
+# source-tracking values do not. Prohibition statements may name a removed
+# maintenance-field category.
+HASH_DIGEST_VALUE_RE = re.compile(
+    r"`?\b(?:sha(?:-?3)?-?\d+|md-?5|blake-?\d\w*|xxh\d*|crc-?\d+)\b`?"
+    r"(?:\s*[:=]\s*|\s+)`?[0-9a-f]{8,}\b`?"
+    r"|\b(?:checksum|hash|digest)(?:\s+value)?\s*[:=]\s*`?\S+",
+    re.IGNORECASE,
+)
+STORED_HEX_IDENTIFIER_RE = re.compile(
+    r"(?<![0-9a-f])(?:[0-9a-f]{32}|[0-9a-f]{40}|[0-9a-f]{56}|"
+    r"[0-9a-f]{64}|[0-9a-f]{96}|[0-9a-f]{128})(?![0-9a-f])",
+    re.IGNORECASE,
+)
+STABLE_HEX_IDENTIFIER_PREFIX_RE = re.compile(
+    r"\b(?:(?:api|interface|publication|release|source|format|schema)\s+)?"
+    r"(?:identifier|id|version|label)\s*[:=]?\s*$",
+    re.IGNORECASE,
+)
+VCS_HASH_VALUE_RE = re.compile(
+    r"\b(?:commit|revision)\s+`?[0-9a-f]{7,40}\b`?|"
+    r"https?://[^\s)]+/(?:commit|blob)/[0-9a-f]{7,40}(?:/|\b)",
+    re.IGNORECASE,
+)
+URL_RE = re.compile(r"https?://[^\s)>`]+")
+VOLATILE_DATE_RE = re.compile(
+    r"(?<![\w./-])(?:\d{4}(?P<ymd_sep>[-/.])\d{2}(?P=ymd_sep)\d{2}|"
+    r"\d{2}(?P<mdy_sep>[-/.])\d{2}(?P=mdy_sep)\d{4})(?![\w./-])|"
+    r"(?<![\w-])(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|"
+    r"Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|"
+    r"Nov(?:ember)?|Dec(?:ember)?)\.?\s+\d{1,2}(?:st|nd|rd|th)?[,]?\s+"
+    r"\d{4}(?!\w)|"
+    r"(?<![\w-])\d{1,2}(?:st|nd|rd|th)?\s+(?:Jan(?:uary)?|Feb(?:ruary)?|"
+    r"Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|"
+    r"Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\.?[,]?\s+"
+    r"\d{4}(?!\w)",
+    re.IGNORECASE,
+)
+STABLE_DATE_IDENTIFIER_RE = re.compile(
+    r"\b(?:api|interface|publication|release|source|format|schema)\s+"
+    r"(?:identifier|id|version|label)\s*[:=]?\s*$",
+    re.IGNORECASE,
+)
+VOLATILE_TIME_RE = re.compile(
+    r"\b(?:[01]?\d|2[0-3]):[0-5]\d"
+    + r"(?::[0-5]\d(?:[.]\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?\b",
+    re.IGNORECASE,
+)
+COUNT_VALUE_PATTERN = (
+    r"(?:\d[\d,]*|zero|one|two|three|four|five|six|seven|eight|nine|ten|"
+    r"eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|"
+    r"nineteen|twenty)"
+)
+VOLATILE_INVENTORY_COUNT_RE = re.compile(
+    r"(?<![\w.-])\d[\d,]*\s+(?:source\s+)?" + r"(?:files?|pages?|sources?|jobs?)\b",
+    re.IGNORECASE,
+)
+VOLATILE_EXISTENTIAL_INVENTORY_RE = re.compile(
+    rf"\bthere\s+(?:are|is)\s+{COUNT_VALUE_PATTERN}\s+(?:source\s+)?"
+    r"(?:files?|pages?|sources?|jobs?)\b",
+    re.IGNORECASE,
+)
+VOLATILE_CATALOG_COUNT_RE = re.compile(
+    r"\b(?:inventory|catalog|aggregate)\b[^.!?\n|]{0,80}"
+    rf"\b{COUNT_VALUE_PATTERN}(?:\s+[A-Za-z][\w-]*){{0,3}}\s+"
+    r"(?:files?|pages?|sources?|generators?|jobs?|cases?|"
+    r"projects?|applications?|builders?|dictionaries?|baselines?|comparisons?|"
+    r"scripts?|modules?)\b",
+    re.IGNORECASE,
+)
+VOLATILE_FIELD_RE = re.compile(
+    r"(?:(?i:\bLast\s+(?:reconciled|checked|audited|reviewed|verified|"
+    r"validated|updated|modified)\s*[:=])|"
+    r"(?i:\b(?:Timestamp|Datestamp|Date stamp|Datetime|Date|Accessed|Created|"
+    r"Updated|Modified|Opened|Resolved|Resolution|Reviewed|Checked|Audited|"
+    r"Audit|Reconciliation|Run date|Validation date|Mtime|Hash|Checksum|Digest|"
+    r"Source count|File count|Page count|Job count|Environment|Run result)"
+    r"(?:\s+(?:at|on|date))?\s*[:=])|"
+    r"(?i:\|\s*(?:Timestamp|Datestamp|Date stamp|Datetime|Date|Mtime|Hash|"
+    r"Checksum|Digest|Accessed|Created|Updated|Modified|Reviewed|Checked|"
+    r"Audited|Audit|Reconciliation|Environment|"
+    r"Run result|Run date|Validation date|Source count|File count|Page count|"
+    r"Job count|Last reconciled|Last checked|Last audited|Last reviewed|"
+    r"Last verified|Last validated|Last updated|Last modified)\s*\|)|"
+    r"\|\s*(?:Opened|Resolved|Resolution)\s*\|)",
+)
+VOLATILE_RESULT_TUPLE_RE = re.compile(
+    r"\b(?:inspected|generated|built|run|result_checked)\s*=\s*"
+    r"(?:pass|fail|not-run|not-applicable)\b",
+    re.IGNORECASE,
+)
+ENVIRONMENT_ASSIGNMENT_RE = re.compile(
+    r"\b(?:environment|platform|compiler|runtime|python|os|host)\s*[:=]\s*"
+    + r"[^;|,]+",
+    re.IGNORECASE,
+)
+VOLATILE_RUN_PROSE_RE = re.compile(
+    r"(?:\b(?:was|were|remained)\s+(?:not\s+)?"
+    r"(?:done|run|rerun|re-run|executed|exercised|inspected|built|generated|"
+    r"validated)\b|"
+    r"\b(?:has|have)\s+(?:not\s+)?been\s+"
+    r"(?:audited|checked|reviewed|re-reviewed|run|rerun|re-run|executed|"
+    r"exercised|inspected|built|generated|validated)\b|"
+    r"\bnot\s+(?:yet\s+)?(?:audited|checked|reviewed|re-reviewed|reconciled|"
+    r"validated)\b|\bunexecuted\b|"
+    r"\bisolated\s+local\s+(?:[\w/-]+\s+){0,3}(?:builds?|runs?|results?)\b|"
+    r"\bvalidation\s+artifacts?\s+(?:was|were)\s+temporary\b|"
+    r"^\s*(?:[-*]\s+)?(?:the\s+)?(?:tests?|checks?|audits?|builds?|runs?|"
+    r"validations?)\s+(?:passed|failed|succeeded|completed)"
+    r"(?:\s+(?:on\s+(?:Linux|macOS|Ubuntu|Windows)"
+    r"(?:\s+[0-9][\w.+-]*)*|in\s+(?:CI|continuous\s+integration)))?"
+    r"\s*[.!?]?\s*$)",
+    re.IGNORECASE,
+)
+MTIME_WORD_RE = re.compile(r"\bmtimes?\b", re.IGNORECASE)
+# A mention is only allowed when a prohibition/supersession keyword precedes
+# it with no sentence boundary in between (e.g. "no `mtime` columns",
+# "supersedes ... mtime source-tracking instructions"). Positive instructions
+# such as "record mtime values" must fail.
+METADATA_PROHIBITION_RE = re.compile(
+    r"\b(?:no|not|never|without|removed?|supersed\w*|prohibit\w*|banned|bans?)\b"
+    r"[^.!?]*\bmtimes?\b",
+    re.IGNORECASE,
+)
+ROOT_KB_ARTIFACT_RE = re.compile(r"^kb_audit_.*[.]md$")
+
+
+class _Link(NamedTuple):
+    """Markdown link with its source location, local path, anchor, and section flag."""
+
+    source: Path
+    line: int
+    label: str
+    target: str
+    target_path: Optional[Path]
+    anchor: str
+    is_source_section: bool
+
+
+def _rel(path: Path) -> str:
+    """
+    Return a repository-relative POSIX path.
+
+    :param path: Absolute or relative path inside the repository.
+    :return: POSIX path relative to the repository root.
+    """
+    return path.resolve().relative_to(ROOT).as_posix()
+
+
+def _is_relative_to(path: Path, base: Path) -> bool:
+    """
+    Return whether ``path`` is under ``base``.
+
+    :param path: Candidate path.
+    :param base: Candidate parent path.
+    :return: Whether ``path`` is equal to or below ``base``.
+    """
+    try:
+        path.resolve().relative_to(base.resolve())
+    except ValueError:
+        return False
+    return True
+
+
+def _fail(failures: List[str], path: Path, line: Optional[int], message: str) -> None:
+    """
+    Append a formatted lint failure.
+
+    :param failures: Mutable failure list.
+    :param path: File or directory associated with the failure.
+    :param line: Optional one-based line number.
+    :param message: Failure detail.
+    """
+    prefix = _rel(path)
+    if line is not None:
+        prefix += f":{line}"
+    failures.append(f"{prefix}: {message}")
+
+
+def _iter_md_files() -> List[Path]:
+    """
+    Return markdown files governed by compiled-KB lint rules.
+
+    :return: Markdown paths included in normal lint checks.
+    """
+    files = [AGENTS]
+    if WIKI.exists():
+        files.extend(sorted(WIKI.rglob("*.md")))
+    sources = RAW / "SOURCES.md"
+    if sources.exists():
+        files.append(sources)
+    return sorted({p.resolve() for p in files})
+
+
+def _wiki_pages() -> List[Path]:
+    """
+    Return all wiki markdown pages.
+
+    :return: Markdown files under ``wiki/``.
+    """
+    if not WIKI.exists():
+        return []
+    return sorted(p.resolve() for p in WIKI.rglob("*.md"))
+
+
+def _read(path: Path) -> str:
+    """
+    Read a UTF-8 text file.
+
+    :param path: File to read.
+    :return: File contents.
+    """
+    return path.read_text(encoding="utf-8")
+
+
+def _line_for_offset(text: str, offset: int) -> int:
+    """
+    Return one-based line number for character offset.
+
+    :param text: Text containing the offset.
+    :param offset: Zero-based character offset.
+    :return: One-based line number.
+    """
+    return text.count("\n", 0, offset) + 1
+
+
+def _list_content_indent(prefix: str) -> int:
+    """Keep code indentation when a list marker has over four padding spaces."""
+    expanded = prefix.expandtabs(4)
+    marker_end = len(expanded.rstrip(" "))
+    padding = len(expanded) - marker_end
+    return marker_end + (padding if padding <= 4 else 1)
+
+
+def _mask_nonprose(text: str) -> str:
+    """
+    Mask fenced code and HTML comments while preserving text offsets.
+
+    :param text: Markdown text.
+    :return: Text with non-prose characters replaced by spaces.
+    """
+
+    def mask_value(value: str) -> str:
+        return "".join("\n" if ch == "\n" else " " for ch in value)
+
+    def repl(match: Match[str]) -> str:
+        return mask_value(match.group(0))
+
+    pattern = (
+        r"^[ ]{0,3}(?P<ticks>`{3,})(?!`)[^\n]*\n"
+        r".*?^[ ]{0,3}(?P=ticks)`*[ \t]*$"
+        r"|^[ ]{0,3}(?P<tildes>~{3,})(?!~)[^\n]*\n"
+        r".*?^[ ]{0,3}(?P=tildes)~*[ \t]*$"
+        r"|<!--.*?-->"
+    )
+    masked = re.sub(pattern, repl, text, flags=re.DOTALL | re.MULTILINE)
+    result: List[str] = []
+    list_contexts: List[Tuple[int, int]] = []
+    list_marker_re = re.compile(r"^([ \t]*)(?:[-+*]|\d{1,9}[.)])([ \t]+)")
+    for line in masked.splitlines(keepends=True):
+        content = line.rstrip("\r\n")
+        if not content.strip():
+            result.append(line)
+            continue
+        leading = re.match(r"^[ \t]*", content)
+        indent = len(leading.group(0).expandtabs(4)) if leading else 0
+        list_marker = list_marker_re.match(content)
+        if list_marker:
+            marker_indent = len(list_marker.group(1).expandtabs(4))
+            content_indent = _list_content_indent(list_marker.group(0))
+            parent_list = next(
+                (
+                    context
+                    for context in reversed(list_contexts)
+                    if context[1] <= marker_indent < context[1] + 4
+                ),
+                None,
+            )
+            if marker_indent > 3 and parent_list is None:
+                result.append(mask_value(line))
+                continue
+            while list_contexts and marker_indent < list_contexts[-1][1]:
+                list_contexts.pop()
+            list_contexts.append((marker_indent, content_indent))
+            if len(list_marker.group(0).expandtabs(4)) > content_indent:
+                result.append(
+                    line[: list_marker.end()] + mask_value(line[list_marker.end() :])
+                )
+            else:
+                result.append(line)
+            continue
+        if indent < 4:
+            while list_contexts and indent <= list_contexts[-1][0]:
+                list_contexts.pop()
+            result.append(line)
+            continue
+        containing_list = next(
+            (context for context in reversed(list_contexts) if context[1] <= indent),
+            None,
+        )
+        if containing_list is not None and indent < containing_list[1] + 4:
+            result.append(line)
+        else:
+            result.append(mask_value(line))
+    return "".join(result)
+
+
+def _mask_inline_code(text: str) -> str:
+    """
+    Mask Markdown inline-code spans while preserving text offsets.
+
+    :param text: Markdown text with block-level non-prose already masked.
+    :return: Text with inline-code characters replaced by spaces.
+    """
+
+    def repl(match: Match[str]) -> str:
+        return "".join("\n" if ch == "\n" else " " for ch in match.group(0))
+
+    pattern = r"(?<!`)(?P<ticks>`+)(?!`)(?P<body>.*?)(?<!`)(?P=ticks)(?!`)"
+    return re.sub(pattern, repl, text, flags=re.DOTALL)
+
+
+def _slugify_heading(title: str) -> str:
+    """
+    Convert a Markdown heading to GitHub-style anchor slug.
+
+    :param title: Heading title.
+    :return: Anchor slug.
+    """
+    slug = re.sub(r"[^\w\s-]", "", title.strip().lower())
+    return re.sub(r"\s+", "-", slug)
+
+
+def _heading_anchors(path: Path) -> Set[str]:
+    """
+    Return Markdown heading anchors defined in a file.
+
+    :param path: Markdown file to scan.
+    :return: Set of heading anchor slugs.
+    """
+    anchors: Set[str] = set()
+    for line in _mask_nonprose(_read(path)).splitlines():
+        match = re.match(r"^(#{1,6})\s+(.+?)\s*$", line)
+        if not match:
+            continue
+        title = re.sub(r"\s+#+\s*$", "", match.group(2)).strip()
+        anchors.add(_slugify_heading(title))
+    return anchors
+
+
+def _headings(text: str) -> List[Tuple[int, str]]:
+    """
+    Return Markdown headings as ``(level, title)`` tuples.
+
+    :param text: Markdown text.
+    :return: Heading level and title pairs.
+    """
+    result: List[Tuple[int, str]] = []
+    for match in re.finditer(r"^(#{2,6})\s+(.+?)\s*$", text, re.MULTILINE):
+        title = re.sub(r"\s+#+\s*$", "", match.group(2)).strip()
+        result.append((len(match.group(1)), title))
+    return result
+
+
+def _section_body(text: str, section: str) -> str:
+    """
+    Return content under a second-level Markdown section.
+
+    :param text: Markdown text.
+    :param section: Section title without hashes.
+    :return: Section body, or an empty string when absent.
+    """
+    match = re.search(rf"^## {re.escape(section)}\s*$", text, re.MULTILINE)
+    if not match:
+        return ""
+    start = match.end()
+    next_match = re.search(r"^##\s+", text[start:], re.MULTILINE)
+    end = start + next_match.start() if next_match else len(text)
+    return text[start:end].strip()
+
+
+def _path_from_link(source: Path, target: str) -> Tuple[Optional[Path], str]:
+    """
+    Resolve a Markdown link target relative to a source file.
+
+    :param source: Markdown file containing the link.
+    :param target: Raw link target.
+    :return: Resolved local path, if any, and decoded anchor.
+    """
+    target = target.strip()
+    if not target:
+        return None, ""
+    parsed = urlparse(target)
+    if parsed.scheme in SKIP_LINK_SCHEMES or parsed.netloc:
+        return None, ""
+    raw_path = parsed.path
+    anchor = unquote(parsed.fragment or "")
+    if not raw_path:
+        return source, anchor
+    if raw_path.startswith("/"):
+        candidate = ROOT / raw_path.lstrip("/")
+    else:
+        candidate = source.parent / unquote(raw_path)
+    return candidate.resolve(), anchor
+
+
+def _in_sources_section(text: str, offset: int) -> bool:
+    """
+    Return whether an offset lies inside a ``Sources`` section.
+
+    :param text: Markdown text.
+    :param offset: Character offset to test.
+    :return: Whether the offset is inside ``## Sources``.
+    """
+    sources_start = re.search(r"^## Sources\s*$", text, re.MULTILINE)
+    if not sources_start:
+        return False
+    next_match = re.search(r"^##\s+", text[sources_start.end() :], re.MULTILINE)
+    sources_end = sources_start.end() + next_match.start() if next_match else len(text)
+    return sources_start.start() <= offset < sources_end
+
+
+def _extract_links(path: Path) -> List[_Link]:
+    """
+    Extract Markdown links outside fenced code blocks and HTML comments.
+
+    :param path: Markdown file to scan.
+    :return: Links with source locations, resolved paths, anchors, and section flags.
+    """
+    text = _read(path)
+    search_text = _mask_inline_code(_mask_nonprose(text))
+    pattern = re.compile(r"(?<!!)\[([^\]\n]+)\]\(([^)\n]+)\)")
+    links: List[_Link] = []
+    for match in pattern.finditer(search_text):
+        label, raw_target = match.groups()
+        target = raw_target.strip()
+        path_part, anchor = _path_from_link(path, target)
+        links.append(
+            _Link(
+                source=path,
+                line=_line_for_offset(search_text, match.start()),
+                label=label.strip(),
+                target=target,
+                target_path=path_part,
+                anchor=anchor,
+                is_source_section=_in_sources_section(search_text, match.start()),
+            )
+        )
+    return links
+
+
+def _source_links(path: Path) -> List[_Link]:
+    """Return Sources links and complete claim-evidence authority list items."""
+    authority_lines: Set[int] = set()
+    authority_indent: Optional[int] = None
+    separated = False
+    for number, raw_line in enumerate(_mask_nonprose(_read(path)).splitlines(), 1):
+        line = raw_line.expandtabs(4)
+        indent = len(line) - len(line.lstrip())
+        if re.match(r"^\s*- (?:Deciding authority|Corroboration):", line):
+            authority_indent = indent
+            separated = False
+        elif not line.strip():
+            separated = True
+        elif authority_indent is not None:
+            peer = re.match(r"^\s*(?:[-+*]\s+|[0-9]+[.)]\s+|#|Claim evidence:)", line)
+            if indent <= authority_indent and (separated or peer):
+                authority_indent = None
+            separated = False
+        if authority_indent is not None:
+            authority_lines.add(number)
+    return [
+        link
+        for link in _extract_links(path)
+        if link.is_source_section or link.line in authority_lines
+    ]
+
+
+def _source_literal(link: _Link) -> str:
+    """Return a citation's exact source identity, excluding wiki navigation."""
+    if urlparse(link.target).scheme in {"http", "https"}:
+        return link.target.split("#", 1)[0]
+    target = link.target_path
+    if target is not None and _is_relative_to(target, ROOT):
+        if not _is_relative_to(target, WIKI):
+            return _rel(target)
+    return ""
+
+
+def _is_router(path: Path) -> bool:
+    """
+    Return whether a path is a KB router page.
+
+    :param path: Candidate page path.
+    :return: Whether the path is a router.
+    """
+    return path.name in ROUTER_NAMES or path == AGENTS
+
+
+def _is_support_page(path: Path) -> bool:
+    """
+    Return whether a path is a governance/support page.
+
+    :param path: Candidate page path.
+    :return: Whether the path is a support page.
+    """
+    return path in SUPPORT_PAGES
+
+
+def _is_normal_leaf(path: Path) -> bool:
+    """
+    Return whether a path is a normal sourced wiki leaf.
+
+    :param path: Candidate page path.
+    :return: Whether the path is a normal leaf.
+    """
+    return (
+        _is_relative_to(path, WIKI)
+        and not _is_router(path)
+        and not _is_support_page(path)
+    )
+
+
+def _check_wikilinks(files: List[Path], failures: List[str]) -> None:
+    """
+    Check governed files for Obsidian-style wikilinks.
+
+    :param files: Markdown files to scan.
+    :param failures: Mutable failure list.
+    """
+    pattern = re.compile(r"\[\[[^\]]+\]\]")
+    for path in files:
+        text = _read(path)
+        for match in pattern.finditer(text):
+            _fail(
+                failures, path, _line_for_offset(text, match.start()), "wikilink found"
+            )
+
+
+def _strip_markdown_containers(text: str) -> str:
+    """Expose container prose one level at a time, masking examples first."""
+    quote = re.compile(r"^[ ]{0,3}>[ ]?")
+    marker = re.compile(r"^[ ]{0,3}(?:[-+*]|[0-9]{1,9}[.)])[ ]+")
+    text = _mask_nonprose(text)
+    while True:
+        lines: List[str] = []
+        list_indent = 0
+        for line in text.splitlines(keepends=True):
+            if not line.strip():
+                lines.append(line)
+                continue
+            line = line.expandtabs(4)
+            indent = len(line) - len(line.lstrip(" "))
+            if list_indent and indent >= list_indent:
+                # Remove the same outer item from its continuation lines.
+                line = line[list_indent:]
+            else:
+                list_indent = 0
+                quoted = quote.match(line)
+                listed = marker.match(line)
+                if quoted is not None:
+                    line = line[quoted.end() :]
+                elif listed is not None:
+                    list_indent = _list_content_indent(listed.group(0))
+                    line = line[list_indent:]
+            lines.append(line)
+        stripped = "".join(lines)
+        if stripped == text:
+            return text
+        # Protect newly exposed code before removing any inner containers.
+        text = _mask_nonprose(stripped)
+
+
+def _check_inline_link_syntax(files: List[Path], failures: List[str]) -> None:
+    """Reject reference links, including definitions within Markdown containers."""
+    pattern = re.compile(
+        r"^[ \t]*\[[^]\n]+\]:|(?<!!)\[[^]\n]+\]\s*\[[^]\n]*\]",
+        re.MULTILINE,
+    )
+    for path in files:
+        text = _strip_markdown_containers(_read(path))
+        text = _mask_inline_code(_mask_nonprose(text))
+        for match in pattern.finditer(text):
+            _fail(
+                failures,
+                path,
+                _line_for_offset(text, match.start()),
+                "reference-style link syntax is unsupported; use [label](target)",
+            )
+
+
+def _check_links(files: List[Path], failures: List[str]) -> Dict[Path, List[Path]]:
+    """
+    Validate Markdown links and return local link graph.
+
+    :param files: Markdown files to scan.
+    :param failures: Mutable failure list.
+    :return: Directed graph of local links.
+    """
+    graph: Dict[Path, List[Path]] = defaultdict(list)
+    anchor_cache: Dict[Path, Set[str]] = {}
+    for path in files:
+        for link in _extract_links(path):
+            target = link.target_path
+            if target is None:
+                continue
+            if not _is_relative_to(target, ROOT):
+                _fail(
+                    failures,
+                    path,
+                    link.line,
+                    f"link target escapes repository: {link.target}",
+                )
+                continue
+            if not target.exists():
+                message = f"link target missing: {link.target}"
+                if link.is_source_section:
+                    message = f"source link target missing: {link.target}"
+                _fail(failures, path, link.line, message)
+                continue
+            if link.anchor:
+                anchor_cache.setdefault(target, _heading_anchors(target))
+                if _slugify_heading(link.anchor) not in anchor_cache[target]:
+                    _fail(
+                        failures, path, link.line, f"link anchor missing: {link.target}"
+                    )
+                    continue
+            graph[path].append(target)
+    return graph
+
+
+def _check_router_detail(files: List[Path], failures: List[str]) -> None:
+    """
+    Check router pages do not contain detail sections.
+
+    :param files: Markdown files to scan.
+    :param failures: Mutable failure list.
+    """
+    for path in files:
+        if path == AGENTS or _is_relative_to(path, WIKI):
+            if _is_router(path) and re.search(
+                r"^## Detail\s*$", _read(path), re.MULTILINE
+            ):
+                _fail(failures, path, None, "router has Detail section")
+
+
+def _check_leaf_contract(pages: List[Path], failures: List[str]) -> None:
+    """
+    Check normal leaves satisfy the required page layout.
+
+    :param pages: Wiki pages to scan.
+    :param failures: Mutable failure list.
+    """
+    for path in pages:
+        if not _is_normal_leaf(path):
+            continue
+        text = _read(path)
+        lines = text.splitlines()
+        if not lines or not lines[0].startswith("# "):
+            _fail(failures, path, 1, "leaf missing H1 title")
+        header_lines = [line for line in lines[1:4] if line.startswith("> ")]
+        if len(header_lines) < 2:
+            _fail(failures, path, 2, "leaf missing two-line blockquote header")
+        elif not any(line.startswith("> Up:") for line in header_lines):
+            _fail(failures, path, 2, "leaf header lacks Up link")
+
+        prose = _mask_nonprose(text)
+        found = [title for level, title in _headings(prose) if level == 2]
+        if found != REQUIRED_LEAF_SECTIONS:
+            _fail(
+                failures,
+                path,
+                None,
+                "leaf H2 sections must be exactly Summary, Detail, Sources, See Also",
+            )
+        for section in ("Sources", "See Also"):
+            if not _section_body(prose, section):
+                _fail(failures, path, None, f"leaf has empty {section}")
+
+        registered = _manifest_literals()
+        source_links = []
+        for link in _extract_links(path):
+            if not link.is_source_section:
+                continue
+            parsed = urlparse(link.target)
+            external_literal = link.target.split("#", 1)[0]
+            external = parsed.scheme in {"http", "https"} and _source_registered(
+                external_literal, registered
+            )
+            local_source = (
+                link.target_path is not None
+                and _is_relative_to(link.target_path, ROOT)
+                and not _is_relative_to(link.target_path, WIKI)
+                and _source_registered(_rel(link.target_path), registered)
+            )
+            if external or local_source:
+                source_links.append(link)
+        if not source_links:
+            _fail(failures, path, None, "leaf Sources has no registered source link")
+
+        see_also = _mask_inline_code(_section_body(prose, "See Also"))
+        see_also_targets: Set[Path] = set()
+        for match in re.finditer(r"(?<!!)\[([^\]\n]+)\]\(([^)\n]+)\)", see_also):
+            target, _ = _path_from_link(path, match.group(2))
+            if target is not None and _is_relative_to(target, WIKI):
+                see_also_targets.add(target)
+        parent = (path.parent / "index.md").resolve()
+        if parent not in see_also_targets:
+            _fail(failures, path, None, "leaf See Also lacks parent router")
+        if not (see_also_targets - {parent, path.resolve()}):
+            _fail(failures, path, None, "leaf See Also lacks neighboring wiki page")
+
+
+def _check_reachability(graph: Dict[Path, List[Path]], failures: List[str]) -> None:
+    """
+    Check all wiki pages are reachable from ``AGENTS.md``.
+
+    :param graph: Directed graph of local links.
+    :param failures: Mutable failure list.
+    """
+    if not AGENTS.exists():
+        return
+    reachable: Set[Path] = set()
+    queue: Deque[Path] = deque([AGENTS.resolve()])
+    while queue:
+        path = queue.popleft()
+        if path in reachable:
+            continue
+        reachable.add(path)
+        for target in graph.get(path, []):
+            if target.is_file() and (
+                target == AGENTS.resolve() or _is_relative_to(target, WIKI)
+            ):
+                queue.append(target)
+
+    for page in _wiki_pages():
+        if page not in reachable:
+            _fail(failures, page, None, "wiki page not reachable from AGENTS.md")
+
+
+def _check_router_membership(
+    pages: List[Path], graph: Dict[Path, List[Path]], failures: List[str]
+) -> None:
+    """Require each content page and branch router in its immediate parent."""
+    for page in pages:
+        if not (_is_normal_leaf(page) or _is_router(page)):
+            continue
+        if page.parent == WIKI or (_is_router(page) and page.parent.parent == WIKI):
+            parent = AGENTS
+        elif _is_router(page):
+            parent = page.parent.parent / "index.md"
+        else:
+            parent = page.parent / "index.md"
+        if page not in graph.get(parent, []):
+            _fail(failures, parent, None, f"parent router lacks child: {_rel(page)}")
+
+
+def _legal_router_target(router: Path, target: Path) -> bool:
+    """
+    Return whether a local router edge obeys router scope.
+
+    :param router: Root or ``index.md`` router.
+    :param target: Resolved local target.
+    :return: Whether the edge is legal.
+    """
+    if target == AGENTS or target in SUPPORT_PAGES or target == SOURCES:
+        return True
+    if router == AGENTS:
+        return target.parent == WIKI or (
+            target.name == "index.md" and target.parent.parent == WIKI
+        )
+    if target.parent == router.parent:
+        return True
+    if target.name == "index.md" and target.parent.parent == router.parent:
+        return True
+    parent_router = (
+        AGENTS if router.parent.parent == WIKI else router.parent.parent / "index.md"
+    )
+    return target == parent_router
+
+
+def _check_router_edges(files: List[Path], failures: List[str]) -> None:
+    """
+    Check routers link only to children, parent/root, and global hubs.
+
+    :param files: Governed Markdown files.
+    :param failures: Mutable failure list.
+    """
+    for router in files:
+        if not _is_router(router):
+            continue
+        for link in _extract_links(router):
+            target = link.target_path
+            if target is None or not _is_relative_to(target, ROOT):
+                continue
+            if not _legal_router_target(router, target):
+                _fail(
+                    failures,
+                    router,
+                    link.line,
+                    f"illegal router edge: {link.target}",
+                )
+
+
+def _check_source_registration(pages: List[Path], failures: List[str]) -> None:
+    """Require registration for each explicit local or external authority."""
+    registered = _manifest_literals()
+    for path in pages:
+        for link in _source_links(path):
+            literal = _source_literal(link)
+            if literal and not _source_registered(literal, registered):
+                _fail(
+                    failures,
+                    path,
+                    link.line,
+                    f"literal source is not registered: {literal}",
+                )
+
+
+def _check_catalog(failures: List[str]) -> None:
+    """
+    Check catalog target equality and page status agreement.
+
+    :param failures: Mutable failure list.
+    """
+    if not CATALOG.exists():
+        return
+    header, located_rows = _table_with_header(CATALOG, "Page")
+    try:
+        page_i = header.index("Page")
+        type_i = header.index("Type")
+        status_i = header.index("Status")
+    except ValueError:
+        _fail(
+            failures,
+            CATALOG,
+            None,
+            "catalog lacks Page/Type/Status columns",
+        )
+        return
+    links: List[Tuple[Path, int, List[str]]] = []
+    for line, row in located_rows:
+        if len(row) <= max(page_i, type_i, status_i):
+            _fail(failures, CATALOG, line, "catalog row has too few columns")
+            continue
+        page_links = list(
+            re.finditer(r"(?<!!)\[([^\]\n]+)\]\(([^)\n]+)\)", row[page_i])
+        )
+        if len(page_links) != 1:
+            _fail(failures, CATALOG, line, "catalog Page cell must contain one link")
+            continue
+        for link in page_links:
+            target, _ = _path_from_link(CATALOG, link.group(2))
+            if target is None or not _is_relative_to(target, WIKI):
+                _fail(failures, CATALOG, line, "catalog Page target is outside wiki")
+                continue
+            links.append((target, line, row))
+    counts = Counter(target for target, _, _ in links)
+    for page in _wiki_pages():
+        count = counts.get(page, 0)
+        if count == 0:
+            _fail(failures, CATALOG, None, f"missing wiki page: {_rel(page)}")
+        elif count > 1:
+            _fail(failures, CATALOG, None, f"duplicate wiki page: {_rel(page)}")
+    live_pages = set(_wiki_pages())
+    for target, line, row in links:
+        if target not in live_pages:
+            _fail(
+                failures,
+                CATALOG,
+                line,
+                f"catalog target is not a live wiki page: {_rel(target)}",
+            )
+            continue
+        expected_status: Optional[str]
+        if _is_router(target):
+            expected_status = "router"
+            if row[type_i].strip().lower() != "router":
+                _fail(failures, CATALOG, line, "router catalog Type must be router")
+        else:
+            expected_status = _page_header_status(target)
+        catalog_status = row[status_i].strip().lower()
+        if expected_status is None:
+            _fail(failures, target, 2, "page header lacks allowed Status")
+        elif catalog_status != expected_status:
+            _fail(
+                failures,
+                CATALOG,
+                line,
+                f"catalog status {catalog_status!r} disagrees with "
+                f"{_rel(target)} status {expected_status!r}",
+            )
+
+
+def _check_content_dir_indexes(failures: List[str]) -> None:
+    """
+    Check content-bearing wiki directories have routers.
+
+    :param failures: Mutable failure list.
+    """
+    for directory, _, files in os.walk(WIKI):
+        path = Path(directory).resolve()
+        if path in EXEMPT_INDEX_DIRS:
+            continue
+        if path == WIKI:
+            continue
+        if any(name.endswith(".md") for name in files) and "index.md" not in files:
+            _fail(failures, path, None, "wiki content directory lacks index.md")
+
+
+def _parse_table(path: Path) -> Tuple[List[str], List[List[str]]]:
+    """
+    Parse the first simple Markdown table in a file.
+
+    :param path: Markdown file containing a table.
+    :return: Header cells and row cells.
+    """
+    if not path.exists():
+        return [], []
+    lines = _read(path).splitlines()
+    header: List[str] = []
+    rows: List[List[str]] = []
+    for line in lines:
+        if not line.startswith("|"):
+            continue
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        if all(re.fullmatch(r":?-{3,}:?", cell) for cell in cells):
+            continue
+        if not header:
+            header = cells
+        else:
+            rows.append(cells)
+    return header, rows
+
+
+def _parse_tables_with_lines(
+    path: Path,
+) -> List[Tuple[List[str], List[Tuple[int, List[str]]]]]:
+    """
+    Parse simple Markdown tables and retain one-based row locations.
+
+    :param path: Markdown file containing zero or more tables.
+    :return: Tables as header plus ``(line, cells)`` rows.
+    """
+    if not path.exists():
+        return []
+    tables: List[Tuple[List[str], List[Tuple[int, List[str]]]]] = []
+    header: Optional[List[str]] = None
+    rows: List[Tuple[int, List[str]]] = []
+    prose = _mask_nonprose(_read(path))
+    for line_number, line in enumerate(prose.splitlines(), start=1):
+        if not line.startswith("|"):
+            if header is not None:
+                tables.append((header, rows))
+                header = None
+                rows = []
+            continue
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        if all(re.fullmatch(r":?-{3,}:?", cell) for cell in cells):
+            continue
+        if header is None:
+            header = cells
+        else:
+            rows.append((line_number, cells))
+    if header is not None:
+        tables.append((header, rows))
+    return tables
+
+
+def _table_with_header(
+    path: Path, required_column: str
+) -> Tuple[List[str], List[Tuple[int, List[str]]]]:
+    """
+    Return first table containing a required column.
+
+    :param path: Markdown file to inspect.
+    :param required_column: Header cell identifying the desired table.
+    :return: Header and located rows, or empty values.
+    """
+    for header, rows in _parse_tables_with_lines(path):
+        if required_column in header:
+            return header, rows
+    return [], []
+
+
+def _literal_code_values(text: str) -> Set[str]:
+    """
+    Return inline-code values from Markdown text.
+
+    :param text: Markdown text.
+    :return: Unique values between single backticks.
+    """
+    return {match.group(1).strip() for match in re.finditer(r"`([^`\n]+)`", text)}
+
+
+def _manifest_literals() -> Set[str]:
+    """
+    Return literals appearing in manifest Source cells only.
+
+    :return: Registered source identifiers and paths.
+    """
+    registered: Set[str] = set()
+    for header, rows in _parse_tables_with_lines(SOURCES):
+        if "Source" not in header:
+            continue
+        source_i = header.index("Source")
+        for _, row in rows:
+            if len(row) > source_i:
+                registered.update(_literal_code_values(row[source_i]))
+    return registered
+
+
+def _source_registered(literal: str, registered: Set[str]) -> bool:
+    """
+    Return whether an exact source identity appears in the manifest.
+
+    NRPyPN registers individual files rather than upstream NRPy aggregates.
+    A directory or an unrelated aggregate name cannot authorize a child path.
+    The manifest itself is the implicit registration authority.
+
+    :param literal: Repository-relative source path or complete external URL.
+    :param registered: Manifest literals.
+    :return: Whether registration is unambiguous.
+
+    >>> _source_registered("nrpypn/PN_p_t.py", {"nrpypn/PN_p_t.py"})
+    True
+    >>> _source_registered("nrpypn/PN_p_t.py", {"nrpypn/"})
+    False
+    >>> _source_registered("nrpy/PN_p_t.py", {"core-top-level-package-modules"})
+    False
+    >>> _source_registered("raw/SOURCES.md", set())
+    True
+    """
+    return literal in registered or literal == "raw/SOURCES.md"
+
+
+def _page_header_status(path: Path) -> Optional[str]:
+    """
+    Extract status from a page header.
+
+    :param path: Wiki page.
+    :return: Lowercase status, when present.
+    """
+    header = "\n".join(_read(path).splitlines()[:5])
+    status_match = re.search(
+        r"\bStatus:\s*(confirmed|provisional|contested|stale)\b",
+        header,
+        re.IGNORECASE,
+    )
+    return status_match.group(1).lower() if status_match else None
+
+
+def _check_glossary_catalog_signal(failures: List[str]) -> None:
+    """
+    Check glossary terms link a defining page, name external background, or have a catalog candidate.
+
+    :param failures: Mutable failure list.
+    """
+    if not (CATALOG.exists() and GLOSSARY.exists()):
+        return
+    catalog_header, catalog_rows = _parse_table(CATALOG)
+    try:
+        page_i = catalog_header.index("Page")
+        candidate_i = catalog_header.index("Concept hub candidate")
+    except ValueError:
+        _fail(failures, CATALOG, None, "catalog lacks Concept hub candidate column")
+        return
+
+    candidates: Set[str] = set()
+    for row in catalog_rows:
+        if len(row) <= max(page_i, candidate_i):
+            continue
+        marker = row[candidate_i].strip().lower()
+        if marker and marker not in {"-", "no", "n/a", "none"}:
+            candidates.add(row[page_i].lower())
+
+    glossary_header, glossary_rows = _parse_table(GLOSSARY)
+    try:
+        term_i = glossary_header.index("Term")
+        meaning_i = glossary_header.index("Meaning")
+    except ValueError:
+        _fail(failures, GLOSSARY, None, "glossary lacks Term/Meaning table")
+        return
+
+    for row in glossary_rows:
+        if len(row) <= max(term_i, meaning_i):
+            continue
+        term = row[term_i].strip()
+        meaning = row[meaning_i].strip()
+        has_owner = bool(re.search(r"\[[^\]]+\]\([^)]+\)", meaning))
+        external = "external" in meaning.lower() or "background" in meaning.lower()
+        candidate = any(term.lower() in entry for entry in candidates)
+        if not (has_owner or external or candidate):
+            _fail(
+                failures,
+                GLOSSARY,
+                None,
+                f"glossary term lacks a defining-page link, external/background designation, or catalog candidate: {term}",
+            )
+
+
+def _check_retired_operation_output(failures: List[str]) -> None:
+    """
+    Check that the retired KB maintenance-output page has not been recreated.
+
+    :param failures: Mutable failure list.
+    """
+    if RETIRED_OPERATION_OUTPUT.exists():
+        _fail(
+            failures,
+            RETIRED_OPERATION_OUTPUT,
+            None,
+            "retired KB maintenance-output page must not exist; use git "
+            "history for durable operations",
+        )
+
+
+def _governed_kb_files() -> List[Path]:
+    """
+    Return authored KB files governed by volatile-data checks.
+
+    Frozen source snapshots preserve imported evidence verbatim and are not
+    authored KB claims. Their registration in ``raw/SOURCES.md`` is governed.
+
+    :return: Authored Markdown files in the compiled KB and source manifest.
+    """
+    return _iter_md_files()
+
+
+def _metadata_mention_allowed(lines: List[str], line_index: int) -> bool:
+    """
+    Return whether a removed maintenance-field mention is prohibition/supersession text.
+
+    Doctests:
+    >>> lines = ["Never store mtime values.", "Record mtime values."]
+    >>> [_metadata_mention_allowed(lines, index) for index in range(2)]
+    [True, False]
+
+    :param lines: File lines being checked.
+    :param line_index: Zero-based index of the line with the mention.
+    :return: Whether same-line context permits the mention.
+    """
+    return METADATA_PROHIBITION_RE.search(lines[line_index]) is not None
+
+
+def _volatile_metadata_issues(line: str) -> List[str]:
+    """
+    Return volatile-data policy violations found in one line.
+
+    Doctests:
+    >>> rejected = (
+    ...     "Last reconciled: 09-12-2026",
+    ...     "checked at 2026-09-12T14:03:22Z",
+    ...     "Checked at 12:34.",
+    ...     "commit 246043709e806021fcfc011fe657b8bf964cae4c",
+    ...     "revision deadbee",
+    ...     "sha256: 0123456789abcdef",
+    ...     "inventory contains 390 files",
+    ...     "The inventory covers 29 generators",
+    ...     "The inventory configures 74 trusted comparisons.",
+    ...     "| Source count | Last checked |",
+    ...     "inspected=pass; generated=not-run",
+    ...     "platform=linux; compiler=gcc-12",
+    ...     "| Audit | Resolution |",
+    ...     "No generated thorn build or restart validation was done.",
+    ...     "Isolated local OpenMP builds and one-step startup were performed.",
+    ...     "Validation artifacts were temporary and were not registered.",
+    ... )
+    >>> all(_volatile_metadata_issues(value) for value in rejected)
+    True
+    >>> allowed = (
+    ...     "The state vector has 24 evolved components.",
+    ...     "Finite-difference order 4 needs two centered halo points.",
+    ...     "Compare CoordSystem_hash before restoring a checkpoint.",
+    ...     "Brown, arXiv:0902.3652v2.",
+    ...     (
+    ...         "https://gist.githubusercontent.com/karpathy/"
+    ...         "442a6bf555914893e9891c11519de94f/raw/"
+    ...         "ac46de1ad27f92b28ac95459c782c07f6b8c964a/llm-wiki.md"
+    ...     ),
+    ...     "https://example.org/archive/2026-09-12/report",
+    ...     "Never store dates, timestamps, hashes, or file counts in KB prose.",
+    ... )
+    >>> [_volatile_metadata_issues(value) for value in allowed]
+    [[], [], [], [], [], [], []]
+
+    :param line: Authored KB line to inspect.
+    :return: Violation messages for the line.
+    """
+    issues: List[str] = []
+    # Complete locators are source identifiers. Opaque path components are not
+    # maintenance snapshots even when they resemble dates or digests.
+    snapshot_line = URL_RE.sub("", line)
+    checks = (
+        (HASH_DIGEST_VALUE_RE, snapshot_line, "hash digest value found"),
+        (VCS_HASH_VALUE_RE, snapshot_line, "VCS revision value found"),
+        (VOLATILE_TIME_RE, snapshot_line, "timestamp literal found"),
+        (VOLATILE_INVENTORY_COUNT_RE, snapshot_line, "inventory count found"),
+        (
+            VOLATILE_EXISTENTIAL_INVENTORY_RE,
+            snapshot_line,
+            "inventory count found",
+        ),
+        (VOLATILE_CATALOG_COUNT_RE, snapshot_line, "catalog count found"),
+        (VOLATILE_FIELD_RE, snapshot_line, "volatile maintenance field found"),
+        (VOLATILE_RESULT_TUPLE_RE, snapshot_line, "recorded result tuple found"),
+        (VOLATILE_RUN_PROSE_RE, snapshot_line, "recorded run/audit prose found"),
+    )
+    for pattern, subject, message in checks:
+        if pattern.search(subject):
+            issues.append(message)
+
+    hex_match = STORED_HEX_IDENTIFIER_RE.search(snapshot_line)
+    if hex_match and not STABLE_HEX_IDENTIFIER_PREFIX_RE.search(
+        snapshot_line[: hex_match.start()]
+    ):
+        issues.append("hash-like value found")
+
+    date_match = VOLATILE_DATE_RE.search(snapshot_line)
+    if date_match and not STABLE_DATE_IDENTIFIER_RE.search(
+        snapshot_line[: date_match.start()]
+    ):
+        issues.append("date literal found")
+    if len(ENVIRONMENT_ASSIGNMENT_RE.findall(snapshot_line)) >= 2:
+        issues.append("recorded environment tuple found")
+    return issues
+
+
+def _check_source_tracking_metadata(failures: List[str]) -> None:
+    """
+    Check governed KB files for forbidden maintenance fields and snapshot values.
+
+    :param failures: Mutable failure list.
+    """
+    for path in _governed_kb_files():
+        lines = _read(path).splitlines()
+        for idx, line in enumerate(lines, start=1):
+            for issue in _volatile_metadata_issues(line):
+                _fail(failures, path, idx, issue)
+            if MTIME_WORD_RE.search(line) and not _metadata_mention_allowed(
+                lines, idx - 1
+            ):
+                _fail(failures, path, idx, "source-tracking Mtime value found")
+
+
+def _check_status_vocabularies(failures: List[str]) -> None:
+    """
+    Check page, manifest, and source-map status vocabularies.
+
+    :param failures: Mutable failure list.
+    """
+    for page in _wiki_pages():
+        if _is_router(page):
+            continue
+        status = _page_header_status(page)
+        if status not in PAGE_STATUSES:
+            _fail(failures, page, 2, "page header has missing or invalid Status")
+
+    for path in (SOURCES, SOURCE_MAP):
+        for header, rows in _parse_tables_with_lines(path):
+            if "Status" not in header:
+                continue
+            status_i = header.index("Status")
+            ingest_i = header.index("Ingest") if "Ingest" in header else None
+            for line, row in rows:
+                if len(row) <= status_i:
+                    _fail(failures, path, line, "source row lacks Status value")
+                    continue
+                if row[status_i].strip().lower() not in SOURCE_STATUSES:
+                    _fail(
+                        failures,
+                        path,
+                        line,
+                        f"invalid source Status: {row[status_i]!r}",
+                    )
+                if ingest_i is not None:
+                    if (
+                        len(row) <= ingest_i
+                        or row[ingest_i].strip().lower() not in INGEST_STATES
+                    ):
+                        value = row[ingest_i] if len(row) > ingest_i else ""
+                        _fail(failures, path, line, f"invalid Ingest state: {value!r}")
+
+
+def _check_source_map_targets(failures: List[str]) -> None:
+    """
+    Check source-map source literals are registered and local targets exist.
+
+    :param failures: Mutable failure list.
+    """
+    source_tables = [
+        (header, rows)
+        for header, rows in _parse_tables_with_lines(SOURCE_MAP)
+        if "Source or aggregate" in header
+    ]
+    if not source_tables:
+        _fail(failures, SOURCE_MAP, None, "source map lacks source table")
+        return
+    registered = _manifest_literals()
+    for header, rows in source_tables:
+        if header != SOURCE_MAP_COLUMNS:
+            _fail(
+                failures,
+                SOURCE_MAP,
+                None,
+                "source-map column headings differ from SOURCE_MAP_COLUMNS",
+            )
+            continue
+        source_i = header.index("Source or aggregate")
+        authority_i = header.index("Authority tier")
+        for line, row in rows:
+            if len(row) != len(header):
+                _fail(
+                    failures, SOURCE_MAP, line, "source-map row has wrong field count"
+                )
+                continue
+            tiers = {tier.strip() for tier in row[authority_i].split(";")}
+            if not tiers or not tiers.issubset(SOURCE_AUTHORITY_TIERS):
+                _fail(failures, SOURCE_MAP, line, "invalid source authority tier")
+            literals = _literal_code_values(row[source_i])
+            if len(literals) != 1:
+                _fail(
+                    failures,
+                    SOURCE_MAP,
+                    line,
+                    "source-map source cell must contain one literal",
+                )
+                continue
+            literal = next(iter(literals))
+            if not _source_registered(literal, registered):
+                _fail(
+                    failures,
+                    SOURCE_MAP,
+                    line,
+                    f"source-map literal is not registered: {literal}",
+                )
+            parsed = urlparse(literal)
+            looks_local = not parsed.scheme and (
+                "/" in literal or literal.startswith(".") or "." in Path(literal).name
+            )
+            if looks_local and not any(char in literal for char in "*?[]"):
+                target = (ROOT / literal).resolve()
+                if not _is_relative_to(target, ROOT) or not target.exists():
+                    _fail(
+                        failures,
+                        SOURCE_MAP,
+                        line,
+                        f"source-map local target missing: {literal}",
+                    )
+
+
+def _check_source_map_dependencies(pages: List[Path], failures: List[str]) -> None:
+    """Require direct citation dependencies without inferring scientific ones."""
+    dependencies: Dict[str, Set[Path]] = defaultdict(set)
+    for header, rows in _parse_tables_with_lines(SOURCE_MAP):
+        if header != SOURCE_MAP_COLUMNS:
+            continue
+        for _, row in rows:
+            if len(row) != len(header):
+                continue
+            literals = _literal_code_values(row[header.index("Source or aggregate")])
+            for literal in literals:
+                dependencies[literal].update(
+                    ROOT / relative
+                    for relative in _affected_page_links(
+                        row[header.index("Dependent pages")]
+                    )
+                )
+    for page in pages:
+        for link in _source_links(page):
+            literal = _source_literal(link)
+            if not literal:
+                continue
+            if literal not in dependencies:
+                _fail(
+                    failures,
+                    SOURCE_MAP,
+                    None,
+                    f"source map lacks cited source: {literal}",
+                )
+            elif page not in dependencies[literal]:
+                _fail(
+                    failures,
+                    SOURCE_MAP,
+                    None,
+                    f"source map lacks dependent page: {_rel(page)} for {literal}",
+                )
+
+
+def _affected_page_links(cell: str) -> List[str]:
+    """
+    Return repository-relative affected-page paths from a table cell.
+
+    :param cell: Wiki support-page table cell with links relative to ``wiki/``.
+    :return: Resolved wiki paths as strings.
+    """
+    paths: List[str] = []
+    for match in re.finditer(r"(?<!!)\[([^\]\n]+)\]\(([^)\n]+)\)", cell):
+        target, _ = _path_from_link(CONTRADICTIONS, match.group(2))
+        if target is not None and _is_relative_to(target, WIKI):
+            paths.append(_rel(target))
+    return paths
+
+
+def _check_contradictions(failures: List[str]) -> None:
+    """
+    Check structured contradiction rows and active marker bidirectionality.
+
+    :param failures: Mutable failure list.
+    """
+    required = [
+        "ID",
+        "Claim",
+        "Claim status",
+        "Source A",
+        "Source B",
+        "Authority decision",
+        "Affected pages",
+        "Page-status rationale",
+        "Owner/trigger",
+        "Resolution test",
+        "Notes",
+    ]
+    header, rows = _table_with_header(CONTRADICTIONS, "ID")
+    if header != required:
+        _fail(
+            failures,
+            CONTRADICTIONS,
+            None,
+            "contradiction table headings differ from the required headings",
+        )
+        return
+    indexes = {name: header.index(name) for name in required}
+    seen: Set[str] = set()
+    active: Dict[str, Tuple[str, Set[str]]] = {}
+    for line, row in rows:
+        if len(row) != len(header):
+            _fail(
+                failures,
+                CONTRADICTIONS,
+                line,
+                "contradiction row has wrong field count",
+            )
+            continue
+        identifier = row[indexes["ID"]].strip("` ")
+        if not re.fullmatch(r"CONTR-\d{4}", identifier):
+            _fail(
+                failures,
+                CONTRADICTIONS,
+                line,
+                f"malformed contradiction ID: {identifier!r}",
+            )
+            continue
+        if identifier in seen:
+            _fail(
+                failures,
+                CONTRADICTIONS,
+                line,
+                f"duplicate contradiction ID: {identifier}",
+            )
+        seen.add(identifier)
+        for field in required:
+            if not row[indexes[field]].strip():
+                _fail(
+                    failures,
+                    CONTRADICTIONS,
+                    line,
+                    f"empty contradiction field: {field}",
+                )
+        status = row[indexes["Claim status"]].strip().lower()
+        if status not in {"contested", "stale", "resolved"}:
+            _fail(failures, CONTRADICTIONS, line, f"invalid Claim status: {status!r}")
+        affected = set(_affected_page_links(row[indexes["Affected pages"]]))
+        if not affected:
+            _fail(failures, CONTRADICTIONS, line, "Affected pages has no wiki links")
+        if status in {"contested", "stale"}:
+            active[identifier] = (status, affected)
+
+    marker_re = re.compile(
+        r"Claim status:\s*(contested|stale);\s*contradiction:\s*(CONTR-\d{4})[.]",
+        re.IGNORECASE,
+    )
+    found_markers: Dict[str, Set[str]] = defaultdict(set)
+    for page in _wiki_pages():
+        if not _is_normal_leaf(page):
+            continue
+        text = _mask_inline_code(_mask_nonprose(_read(page)))
+        for match in marker_re.finditer(text):
+            status, identifier = match.group(1).lower(), match.group(2)
+            found_markers[identifier].add(_rel(page))
+            backlink = any(
+                link.target_path == CONTRADICTIONS.resolve()
+                and _slugify_heading(link.anchor) == identifier.lower()
+                for link in _extract_links(page)
+            )
+            if not backlink:
+                _fail(
+                    failures,
+                    page,
+                    _line_for_offset(text, match.start()),
+                    f"marker lacks backlink for {identifier}",
+                )
+            if identifier not in active:
+                _fail(
+                    failures,
+                    page,
+                    _line_for_offset(text, match.start()),
+                    f"marker references missing or resolved contradiction: {identifier}",
+                )
+            elif active[identifier][0] != status:
+                _fail(
+                    failures,
+                    page,
+                    _line_for_offset(text, match.start()),
+                    f"marker status disagrees with {identifier}",
+                )
+    for identifier, (_, affected) in active.items():
+        markers = found_markers.get(identifier, set())
+        for page_path in sorted(affected - markers):
+            _fail(
+                failures,
+                ROOT / page_path,
+                None,
+                f"missing active marker for {identifier}",
+            )
+        for page_path in sorted(markers - affected):
+            _fail(
+                failures,
+                ROOT / page_path,
+                None,
+                f"marker page absent from Affected pages for {identifier}",
+            )
+
+
+def _check_excluded_artifacts(failures: List[str]) -> None:
+    """
+    Check KB trees contain Markdown prose only and no retired maintenance files.
+
+    :param failures: Mutable failure list.
+    """
+    for base in (WIKI, RAW):
+        if not base.exists():
+            continue
+        for path in sorted(base.rglob("*")):
+            if path.is_file() and path.suffix.lower() != ".md":
+                _fail(failures, path, None, "non-Markdown file in KB tree")
+            if path.is_file() and re.search(
+                r"(?:^|[-_])(audit|scan|report|latest|token|plan|rank|log)(?:[-_.]|$)",
+                path.name,
+                re.IGNORECASE,
+            ):
+                _fail(failures, path, None, "excluded maintenance/planning file")
+
+
+def _check_root_artifacts(failures: List[str]) -> None:
+    """
+    Check for prohibited root-level maintenance files.
+
+    :param failures: Mutable failure list.
+    """
+    allowed_root_docs = {"AGENTS.md", "README.md", "CITATION.md", "coding_style.md"}
+    for path in ROOT.glob("*.md"):
+        if path.name in allowed_root_docs:
+            continue
+        if ROOT_PROHIBITED_ARTIFACT_SEGMENT_RE.search(path.name):
+            _fail(failures, path, None, "root-level prohibited maintenance file")
+            continue
+        if ROOT_COORDINATION_RE.fullmatch(path.name):
+            continue
+        if (
+            re.fullmatch(r".*kb.*instructions.*[.]md", path.name, re.IGNORECASE)
+            or ROOT_KB_ARTIFACT_RE.match(path.name)
+            or re.search(
+                r"(?:^|[-_])(audit|scan|report|latest|token|plan|rank|tasks?)(?:[-_.]|$)",
+                path.name,
+                re.IGNORECASE,
+            )
+        ):
+            _fail(failures, path, None, "root-level prohibited maintenance file")
+
+
+def _main() -> int:
+    """
+    Run KB lint checks.
+
+    :return: Process exit status.
+    """
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        help="compatibility alias; identical to default full deterministic coverage",
+    )
+    parser.parse_args()
+
+    failures: List[str] = []
+    files = _iter_md_files()
+    pages = _wiki_pages()
+
+    _check_wikilinks(files, failures)
+    _check_inline_link_syntax(files, failures)
+    graph = _check_links(files, failures)
+    _check_router_detail(files, failures)
+    _check_router_edges(files, failures)
+    _check_leaf_contract(pages, failures)
+    _check_source_registration(pages, failures)
+    _check_reachability(graph, failures)
+    _check_router_membership(pages, graph, failures)
+    _check_catalog(failures)
+    _check_content_dir_indexes(failures)
+    _check_glossary_catalog_signal(failures)
+    _check_status_vocabularies(failures)
+    _check_source_map_targets(failures)
+    _check_source_map_dependencies(pages, failures)
+    _check_contradictions(failures)
+    _check_excluded_artifacts(failures)
+    _check_retired_operation_output(failures)
+    _check_source_tracking_metadata(failures)
+    _check_root_artifacts(failures)
+
+    if failures:
+        print("KB lint failed:")
+        for item in sorted(failures):
+            print(f"- {item}")
+        return 1
+
+    print("KB lint passed.")
+    return 0
+
+
+if __name__ == "__main__":
+    import doctest
+
+    if doctest.testmod().failed:
+        sys.exit(1)
+    sys.exit(_main())
