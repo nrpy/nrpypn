@@ -133,12 +133,16 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 1) Bibtex entry:
 
-@article{Habib:2020dba,
-    author = "Habib, Sarah and Ramos-Buades, Antoni and Huerta, E.A. and Husa, Sascha and Haas, Roland and Etienne, Zachariah",
-    title = "{Initial Data and Eccentricity Reduction Toolkit for Binary Black Hole Numerical Relativity Waveforms}",
-    eprint = "2011.08878",
-    archivePrefix = "arXiv",
-    primaryClass = "gr-qc",
-    month = "11",
-    year = "2020"
+@article{Habib_2021,
+  doi = {10.1088/1361-6382/abe691},
+  url = {https://doi.org/10.1088/1361-6382/abe691},
+  year = {2021},
+  month = {may},
+  publisher = {IOP Publishing},
+  volume = {38},
+  number = {12},
+  pages = {125007},
+  author = {Habib, Sarah and Ramos-Buades, Antoni and Huerta, E A and Husa, Sascha and Haas, Roland and Etienne, Zachariah},
+  title = {Initial data and eccentricity reduction toolkit for binary black hole numerical relativity waveforms},
+  journal = {Classical and Quantum Gravity}
 }
